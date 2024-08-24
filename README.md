@@ -9,8 +9,8 @@ PowerShell script to extract and report Exchange server health statistics.
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
   - [ReportOptions](#reportoptions)
   - [Thresholds](#thresholds)
-  - [MailAndReportParameters](#mailandreportparameters)
-  - [Exclusions](#exclusions)
+  - [Mail](#mail)
+  - [Exclusion](#exclusion)
 - [Usage Examples](#usage-examples)
   - [Example 1: Running Manually in Exchange Management Shell](#example-1-running-manually-in-exchange-management-shell)
 
@@ -46,44 +46,44 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
 ```powershell
 @{
     ReportOptions           = @{
-        RunCPUandMemoryReport   = $true
-        RunServerHealthReport   = $true
-        RunMdbReport            = $true
-        RunComponentReport      = $true
-        RunPdbReport            = $true
-        RunDAGReplicationReport = $true
-        RunQueueReport          = $true
-        RunDiskReport           = $true
-        RunDBCopyReport         = $true
-        SendReportViaEmail      = $false
-        ReportFile              = "MG_PoshLab_Exchange.html"
+        CPU_and_RAM   = $true
+        Server_Health   = $true
+        Mailbox_Database           = $true
+        Server_Component      = $true
+        Public_Folder_Database            = $true
+        DAG_Replication = $true
+        Mail_Queue          = $true
+        Disk_Space           = $true
+        Database_Copy         = $true
+        Send_Email_Report      = $false
+        Report_File_Path              = "MG_PoshLab_Exchange.html"
     }
     Thresholds              = @{
-        LastFullBackup        = 0
-        LastIncrementalBackup = 0
-        DiskSpaceFree         = 12
-        MailQueueCount        = 20
-        CopyQueueLenght       = 10
-        ReplayQueueLenght     = 10
-        CpuUsage              = 60
-        RamUsage              = 80
+        Last_Full_Backup_Age_Day        = 0
+        Last_Incremental_Backup_Age_Day = 0
+        Disk_Space_Free_Percent         = 12
+        Mail_Queue_Count        = 20
+        Copy_Queue_Length       = 10
+        Replay_Queue_Length     = 10
+        CPU_Usage_Percent              = 60
+        RAM_Usage_Percent              = 80
     }
-    MailAndReportParameters = @{
-        CompanyName = "MG PoshLab"
-        MailSubject = "Exchange Service Health Report"
-        MailServer  = "mail.mg.poshlab.xyz"
-        MailSender  = "MG PostMaster <exchange-Admin@mg.poshlab.xyz>"
-        MailTo      = @('june@poshlab.xyz', 'tito.castillote-jr@dxc.com', 'june.castillote@gmail.com')
-        MailCc      = @()
-        MailBcc     = @()
-        SSLEnabled  = $false
+    Mail = @{
+        Company_Name = "MG PoshLab"
+        Email_Subject = "Exchange Service Health Report"
+        SMTP_Server  = "mail.mg.poshlab.xyz"
+        Sender_Address  = "MG PostMaster <exchange-Admin@mg.poshlab.xyz>"
+        To_Address      = @('june@poshlab.xyz', 'tito.castillote-jr@dxc.com', 'june.castillote@gmail.com')
+        Cc_Address      = @()
+        Bcc_Address     = @()
+        SSL_Enabled  = $false
         Port        = 25
     }
     Exclusions              = @{
-        IgnoreServer     = @()
-        IgnoreDatabase   = @()
-        IgnorePFDatabase = @()
-        IgnoreComponent  = @('ForwardSyncDaemon', 'ProvisioningRps')
+        Ignore_Server_Name     = @()
+        Ignore_MB_Database   = @()
+        Ignore_PF_Database = @()
+        Server_Component  = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
 }
 ```
@@ -94,52 +94,52 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
 
 This section can be toggled by changing values with `$true` or `$false`.
 
-- `RunServerHealthReport` - Run test and report the Server Health status
+- `Server_Health` - Run test and report the Server Health status
 - `RunMdbReport` - Mailbox Database test and report
-- `RunComponentReport` - Server Components check
-- `RunPdbReport` - For checking the Public Folder database(s)
-- `RunDAGReplicationReport` - Check and test replication status
-- `RunQueueReport` - Inspect mail queue count
-- `RunDiskReport` - Disk space report for each server
-- `RunDBCopyReport` - Checking the status of the Database Copies
-- `SendReportViaEmail` - Option to send the HTML report via email
-- `ReportFile` - File path and name of the HTML Report
+- `Server_Component` - Server Components check
+- `Public_Folder_Database` - For checking the Public Folder database(s)
+- `DAG_Replication` - Check and test replication status
+- `Mail_Queue` - Inspect mail queue count
+- `Disk_Space` - Disk space report for each server
+- `Database_Copy` - Checking the status of the Database Copies
+- `Send_Email_Report` - Option to send the HTML report via email
+- `Report_File_Path` - File path and name of the HTML Report
 
 ### Thresholds
 
 This section defines at which levels the script will report a problem for each check item.
 
-- `LastFullBackup` - age of full backup in days. Setting this to zero (0) will cause the script to ignore this threshold
-- `LastIncrementalBackup` - age of incremental backup in days. Setting this to zero (0) will cause the script to ignore this threshold.
-- `DiskSpaceFree` - percent (%) of free disk space left
-- `MailQueueCount` - Mail transport queue threshold
-- `CopyQueueLenght` - CopyQueueLenght threshold for the DAG replication
-- `ReplayQueueLenght` - ReplayQueueLenght threshold
-- `CpuUsage` - CPU usage threshold %
-- `RamUsage` - Memory usage threshold %
+- `Last_Full_Backup_Age_Day` - age of full backup in days. Setting this to zero (0) will cause the script to ignore this threshold
+- `Last_Incremental_Backup_Age_Day` - age of incremental backup in days. Setting this to zero (0) will cause the script to ignore this threshold.
+- `Disk_Space_Free_Percent` - percent (%) of free disk space left
+- `Mail_Queue_Count` - Mail transport queue threshold
+- `Copy_Queue_Length` - Copy_Queue_Length threshold for the DAG replication
+- `Replay_Queue_Length` - Replay_Queue_Length threshold
+- `CPU_Usage_Percent` - CPU usage threshold %
+- `RAM_Usage_Percent` - Memory usage threshold %
 
-### MailAndReportParameters
+### Mail
 
 This section specifies the mail parameters.
 
-- `CompanyName` - The name of the organization or company that you want to appear in the banner of the report.
-- `MailSubject` - Subject of the email report.
-- `MailServer` - The SMTP Relay server.
-- `MailSender` - Mail sender address.
-- `MailTo` - Recipient TO address(es).
-- `MailCc` - Recipient CC address(es).
-- `MailBcc` - Recipient BCC address(es).
-- `SSLEnabled` - Turn on or off the SSL connection.
+- `Company_Name` - The name of the organization or company that you want to appear in the banner of the report.
+- `Email_Subject` - Subject of the email report.
+- `SMTP_Server` - The SMTP Relay server.
+- `Sender_Address` - Mail sender address.
+- `To_Address` - Recipient TO address(es).
+- `Cc_Address` - Recipient CC address(es).
+- `Bcc_Address` - Recipient BCC address(es).
+- `SSL_Enabled` - Turn on or off the SSL connection.
 - `Port` - The SMTP server's listening port number.
 
-### Exclusions
+### Exclusion
 
 This section is where the exclusions can be defined.
 
-- `IgnoreServer` - List of servers to be ignored by the script.
-- `IgnoreDatabase` - List of Mailbox Database to be ignored by the script.
-- `IgnorePFDatabase` - List of Public Folder Database to be ignored by the script.
-- `IgnoreComponent` - List of Server Components to be ignored by the script.
+- `Ignore_Server_Name` - List of servers to be ignored by the script.
+- `Ignore_MB_Database` - List of Mailbox Database to be ignored by the script.
+- `Ignore_PF_Database` - List of Public Folder Database to be ignored by the script.
+- `Server_Component` - List of Server Components to be ignored by the script.
 
 ## Usage Examples
 
