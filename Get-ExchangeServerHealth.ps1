@@ -572,7 +572,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
     $mbody += '<table id="SectionLabels"><tr><th class="data">Server Health Status</th></tr></table>'
     $mbody += '<table id="data">'
     # $mbody += '<tr><th>Server</th><th>Version / Edition</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
-    $mbody += '<tr><th>Server Name</th><th>Exchange Server Info</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
+    $mbody += '<tr><th>Server Name</th><th>Exchange Server</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
     foreach ($server in $serverhealthinfo) {
         $mbody += "<tr><td>$($server.server)</td><td>Name: $($server.ProductName)<br/>Build: $($server.BuildNumber) [$($server.KB)]<br/>Edition: $($server.Edition)</td><td>$($server.ADSite)</td>"
         #Uptime
