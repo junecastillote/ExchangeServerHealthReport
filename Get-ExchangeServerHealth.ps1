@@ -15,7 +15,7 @@
 
 .LICENSEURI
 
-.PROJECTURI https://github.com/junecastillote/Get-ExchangeServerHealth
+.PROJECTURI https://github.com/junecastillote/Exchange-Server-Health-Report
 
 .ICONURI
 
