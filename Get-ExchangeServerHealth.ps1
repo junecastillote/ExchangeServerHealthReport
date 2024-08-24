@@ -7,7 +7,7 @@
 
 .AUTHOR June Castillote
 
-.COMPANYNAME
+.Company_Name
 
 .COPYRIGHT
 
@@ -27,7 +27,7 @@
 
 .RELEASENOTES
 {
-  "ReleaseDate": "2024-08-08"
+  "ReleaseDate" : "2024-08-08"
 }
 
 .PRIVATEDATA
@@ -49,7 +49,6 @@ param (
     [switch]$EnableDebug
 )
 $script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
-# $release_notes = ($script_info.ReleaseNotes | ConvertFrom-Json)
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 if ($enableDebug) { Start-Transcript -Path ($script_root + "\debugLog.txt") }
 
@@ -78,9 +77,64 @@ Function AdminDisplayVersionToName {
     BuildNumberToName (TrimExchangeVersion $AdminDisplayVersion)
 }
 
+Function GetExchangeServerVerion {
+    param(
+        [string]$ComputerName = '.'
+    )
+    Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+        $(
+            $product_table = @{
+                '14.0' = 'Exchange Server 2010'
+                '14.1' = 'Exchange Server 2010 SP1'
+                '14.2' = 'Exchange Server 2010 SP2'
+                '14.3' = 'Exchange Server 2010 SP3'
+                '15.0' = 'Exchange Server 2013'
+                '15.1' = 'Exchange Server 2016'
+                '15.2' = 'Exchange Server 2019'
+            }
+
+            try {
+                $exSetup = Get-Command Exsetup.exe -ErrorAction Stop
+                $exSetup | Add-Member -MemberType NoteProperty -Name ProductName -Value $($product_table["$($exSetup.Version.Major).$($exSetup.Version.Minor)"])
+                $exSetup
+            }
+            catch {
+                $null
+            }
+        )
+    }
+}
+
+Function Say {
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        # [ValidateNotNullOrEmpty()]
+        $Text,
+
+        [Parameter()]
+        [ValidateSet(
+            'Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White'
+        )]
+        [string]$Color
+    )
+    process {
+
+        if ($Text -eq '') {
+            '' | Out-Default
+        }
+        else {
+            if ($Color) {
+                $Host.UI.RawUI.ForegroundColor = $Color
+            }
+            "$(Get-Date -Format 'dd-MMM-yyyy HH:mm:ss') : $Text" | Out-Host
+        }
+        [Console]::ResetColor()
+    }
+}
+
 #Import Configuration File
 if ((Test-Path $configFile) -eq $false) {
-    "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-Default
+    "ERROR: File $($configFile) does not exist. Script cannot continue" | Say
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt
     if ($enableDebug) { Stop-Transcript }
     return $null
@@ -90,16 +144,17 @@ $config = Import-PowerShellDataFile $configFile
 
 # Start Script
 $hr = "=" * ($script_info.ProjectUri.OriginalString.Length)
-$hr | Out-Default
-"$($script_info.Name) $($script_info.Version) ($(($script_info.ReleaseNotes | ConvertFrom-Json).ReleaseDate))" | Out-Default
-"$($script_info.ProjectUri.OriginalString)" | Out-Default
-$hr | Out-Default
-'' | Out-Default
-': Begin' | Out-Default
-': Setting Paths and Variables' | Out-Default
+$hr | Say
+"$($script_info.Name) $($script_info.Version) ($(($script_info.ReleaseNotes | ConvertFrom-Json).ReleaseDate))" | Say
+"$($script_info.ProjectUri.OriginalString)" | Say
+$hr | Say
+# '' | Say
+'Begin' | Say
+'Setting Paths and Variables' | Say
 
 #Define Variables
-$testCount = 0
+$availableTestCount = $config.TestItem.Count
+$enabledTestCount = ($config.TestItem.GetEnumerator() | Where-Object { $_.Value }).Count
 $testFailed = 0
 $testPassed = 0
 $percentPassed = 0
@@ -213,45 +268,48 @@ $css_string = @'
 <body>
 '@
 
-#Thresholds from config
-[int]$t_lastfullbackup = $config.thresholds.LastFullBackup
-[int]$t_lastincrementalbackup = $config.thresholds.LastIncrementalBackup
-[double]$t_DiskBadPercent = $config.thresholds.DiskSpaceFree
-[int]$t_mQueue = $config.thresholds.MailQueueCount
-[int]$t_copyQueue = $config.thresholds.CopyQueueLenght
-[int]$t_replayQueue = $config.thresholds.ReplayQueueLenght
-[double]$t_cpuUsage = $config.thresholds.CpuUsage
-[double]$t_ramUsage = $config.thresholds.RamUsage
+# Thresholds from config
+[int]$t_Last_Full_Backup_Age_Day = $config.Threshold.Last_Full_Backup_Age_Day
+[int]$t_Last_Incremental_Backup_Age_Day = $config.Threshold.Last_Incremental_Backup_Age_Day
+[double]$t_DiskBadPercent = $config.Threshold.Disk_Space_Free_Percent
+[int]$t_mQueue = $config.Threshold.Mail_Queue_Count
+[int]$t_copyQueue = $config.Threshold.Copy_Queue_Length
+[int]$t_replayQueue = $config.Threshold.Replay_Queue_Length
+[double]$t_CPU_Usage_Percent = $config.Threshold.CPU_Usage_Percent
+[double]$t_RAM_Usage_Percent = $config.Threshold.RAM_Usage_Percent
 
-#Options from config
-$RunCPUandMemoryReport = $config.reportOptions.RunCPUandMemoryReport
-$RunServerHealthReport = $config.reportOptions.RunServerHealthReport
-$RunMdbReport = $config.reportOptions.RunMdbReport
-$RunComponentReport = $config.reportOptions.RunComponentReport
-$RunPdbReport = $config.reportOptions.RunPdbReport
-$RunDBCopyReport = $config.reportOptions.RunDBCopyReport
-$RunDAGReplicationReport = $config.reportOptions.RunDAGReplicationReport
-$RunQueueReport = $config.reportOptions.RunQueueReport
-$RunDiskReport = $config.reportOptions.RunDiskReport
-$SendReportViaEmail = $config.reportOptions.SendReportViaEmail
-# $reportfile = $config.reportOptions.ReportFile
-$reportfile = (New-Item -ItemType File -Path $config.reportOptions.ReportFile -Force).FullName
+# Options from config
+$CPU_and_RAM = $config.TestItem.CPU_and_RAM
+$Server_Health = $config.TestItem.Server_Health
+$Mailbox_Database = $config.TestItem.Mailbox_Database
+$Server_Component = $config.TestItem.Server_Component
+$Public_Folder_Database = $config.TestItem.Public_Folder_Database
+$Database_Copy = $config.TestItem.Database_Copy
+$DAG_Replication = $config.TestItem.DAG_Replication
+$Mail_Queue = $config.TestItem.Mail_Queue
+$Disk_Space = $config.TestItem.Disk_Space
 
+# Output
+$Report_File_Path = (New-Item -ItemType File -Path $config.Output.Report_File_Path -Force).FullName
 
 #Mail settings
-$CompanyName = $config.mailAndReportParameters.CompanyName
-$MailSubject = $config.mailAndReportParameters.MailSubject
-$MailServer = $config.mailAndReportParameters.MailServer
-$MailSender = $config.mailAndReportParameters.MailSender
-$MailTo = @($config.mailAndReportParameters.MailTo)
-$MailCc = @($config.mailAndReportParameters.MailCc)
-$MailBcc = @($config.mailAndReportParameters.MailBcc)
+$Send_Email_Report = $config.Mail.Send_Email_Report
+$Company_Name = $config.Branding.Company_Name
+$Email_Subject = $config.Mail.Email_Subject
+$SMTP_Server = $config.Mail.SMTP_Server
+$Port = $config.Mail.Port
+$SSL_Enabled = $config.Mail.SSL_Enabled
+$Sender_Address = $config.Mail.Sender_Address
+$To_Address = @($config.Mail.To_Address)
+$Cc_Address = @($config.Mail.Cc_Address)
+$Bcc_Address = @($config.Mail.Bcc_Address)
+
 
 #Exclusions
-$IgnoreServer = @($config.exclusions.IgnoreServer)
-$IgnoreDatabase = @($config.exclusions.IgnoreDatabase)
-$IgnorePFDatabase = @($config.exclusions.IgnorePFDatabase)
-$IgnoreComponent = @($config.exclusions.IgnoreComponent)
+$Ignore_Server_Name = @($config.Exclusion.Ignore_Server_Name)
+$Ignore_MB_Database = @($config.Exclusion.Ignore_MB_Database)
+$Ignore_PF_Database = @($config.Exclusion.Ignore_PF_Database)
+$Ignore_Server_Component = @($config.Exclusion.Ignore_Server_Component)
 
 Function Get-CPUAndMemoryLoad ($exchangeServers) {
     $stats_collection = @()
@@ -261,7 +319,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         #Get CPU Usage
         $x = Get-Counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -computer $exchangeServer.Name | Select-Object -ExpandProperty countersamples | Select-Object -Property cookedvalue
 
-        ": Getting CPU Load for $($exchangeServer.Name)" | Out-Default
+        "Getting CPU Load for $($exchangeServer.Name)" | Say
         $cpuMemObject = "" | Select-Object Server, CPU_Usage, Top_CPU_Consumers, Total_Memory_KB, Memory_Free_KB, Memory_Used_KB, Memory_Free_Percent, Memory_Used_Percent, Top_Memory_Consumers
         $cpuMemObject.Server = $exchangeServer.Name
         $cpuMemObject.CPU_Usage = "{0:N0}" -f ($x.cookedvalue)
@@ -282,7 +340,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         }
         $cpuMemObject.Top_CPU_Consumers = $TopProcessCPU
 
-        ": Getting Memory Load for $($exchangeServer.Name)" | Out-Default
+        "Getting Memory Load for $($exchangeServer.Name)" | Say
         # $memObj = Get-CimInstance -ComputerName $exchangeServer.Name -ClassName Win32_operatingsystem -Property CSName, TotalVisibleMemorySize, FreePhysicalMemory
         $memObj = Get-CimInstance -ComputerName $exchangeServer.Name -ClassName Win32_operatingsystem -Property CSName, TotalVisibleMemorySize, FreePhysicalMemory
         $cpuMemObject.Total_Memory_KB = $memObj.TotalVisibleMemorySize
@@ -305,7 +363,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
 
         $TopProcessMemory = ""
         foreach ($proc in $proclist) {
-            $topProc = "$($proc.ProcessName) | $($proc.MemoryUsed) KB `n"
+            $topProc = "$($proc.ProcessName) | $($proc.MemoryUsed.ToString('N0')) KB `n"
             $TopProcessMemory += $topProc
         }
 
@@ -325,7 +383,7 @@ Function Ping-Server ($server) {
 }
 
 Function Get-MdbStatistic ($mailboxdblist) {
-    ': Mailbox Database Check... ' | Out-Default
+    'Mailbox Database Check... ' | Say
     $stats_collection = @()
     foreach ($mailboxdb in $mailboxdblist) {
         if (Ping-Server($mailboxdb.Server.Name) -eq $true) {
@@ -349,8 +407,8 @@ Function Get-MdbStatistic ($mailboxdblist) {
                 #Get Disk Details
                 $dbDrive = (Get-CimInstance Win32_LogicalDisk -Computer $mailboxdb.Server.Name | Where-Object { $_.DeviceID -eq $mailboxdb.EdbFilePath.DriveName })
                 $logDrive = (Get-CimInstance Win32_LogicalDisk -Computer $mailboxdb.Server.Name | Where-Object { $_.DeviceID -eq $mailboxdb.LogFolderPath.DriveName })
-                $mdbobj.EDBFreeSpace = "{0:N2}" -f ($dbDrive.Size / 1GB) + '[' + "{0:N2}" -f ($dbDrive.FreeSpace / 1GB) + ']'
-                $mdbobj.LogFreeSpace = "{0:N2}" -f ($logDrive.Size / 1GB) + '[' + "{0:N2}" -f ($logDrive.FreeSpace / 1GB) + ']'
+                $mdbobj.EDBFreeSpace = "{0:N2}" -f ($dbDrive.Size / 1GB) + ' [' + "{0:N2}" -f ($dbDrive.FreeSpace / 1GB) + ']'
+                $mdbobj.LogFreeSpace = "{0:N2}" -f ($logDrive.Size / 1GB) + ' [' + "{0:N2}" -f ($logDrive.FreeSpace / 1GB) + ']'
             }
             else {
                 $mdbobj.ActiveMailboxCount = "DISMOUNTED"
@@ -405,7 +463,7 @@ Function Get-MdbStatistic ($mailboxdblist) {
 }
 
 Function Get-PdbStatistic ($pfdblist) {
-    ': Public Folder Database Check... ' | Out-Default
+    'Public Folder Database Check... ' | Say
     $stats_collection = @()
     foreach ($pfdb in $pfdblist) {
         $pfdbobj = "" | Select-Object Name, Mounted, MountedOnServer, DatabaseSize, AvailableNewMailboxSpace, FolderCount, TotalItemSize, LastFullBackup, LastIncrementalBackup, BackupInProgress, MapiConnectivity
@@ -436,7 +494,7 @@ Function Get-PdbStatistic ($pfdblist) {
 }
 
 Function Get-DiskSpaceStatistic ($serverlist) {
-    ': Disk Space Check... ' | Out-Default
+    'Disk Space Check... ' | Say
     $stats_collection = @()
     foreach ($server in $serverlist) {
         try {
@@ -467,14 +525,14 @@ Function Get-DiskSpaceStatistic ($serverlist) {
 }
 
 Function Get-ReplicationHealth {
-    ': Replication Health Check... ' | Out-Default
+    'Replication Health Check... ' | Say
     $stats_collection = Get-MailboxServer | Where-Object { $_.DatabaseAvailabilityGroup } | Sort-Object Name | ForEach-Object { Test-ReplicationHealth -Identity $_ }
 
     return $stats_collection
 }
 
 Function Get-MailQueueCount ($transportServerList) {
-    ': Mail Queue Check... ' | Out-Default
+    'Mail Queue Check... ' | Say
     #$stats_collection = get-TransportServer | Where-Object {$_.ServerRole -notmatch 'Edge'} | Sort-Object Name | ForEach-Object {Get-Queue -Server $_}
     $stats_collection = $transportServerList | Sort-Object Name | ForEach-Object { Get-Queue -Server $_ | Where-Object { $_.Identity -notmatch 'Shadow' } }
 
@@ -482,11 +540,12 @@ Function Get-MailQueueCount ($transportServerList) {
 }
 
 Function Get-ServerHealth ($serverlist) {
-    ': Server Status Check... ' | Out-Default
+    'Server Status Check... ' | Say
     $stats_collection = @()
     foreach ($server in $serverlist) {
         if (Ping-Server($server.name) -eq $true) {
-            $exchange_product = (AdminDisplayVersionToName -AdminDisplayVersion $server.AdminDisplayVersion)
+            # $exchange_product = (AdminDisplayVersionToName -AdminDisplayVersion $server.AdminDisplayVersion)
+            $exchange_version = GetExchangeServerVerion -ComputerName $server.name
 
             $serverOS = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $server
 
@@ -495,9 +554,11 @@ Function Get-ServerHealth ($serverlist) {
             [int]$uptime = "{0:00}" -f $timespan.TotalHours
 
             $serverobj.Server = $server.Name
-            $serverobj.ProductName = $exchange_product.'Product Name'
-            $serverobj.BuildNumber = $exchange_product.'Build Number'
-            $serverobj.KB = $exchange_product.KB
+            # $serverobj.ProductName = $exchange_product.'Product Name'
+            $serverobj.ProductName = $exchange_version.ProductName
+            # $serverobj.BuildNumber = $exchange_product.'Build Number'
+            $serverobj.BuildNumber = $exchange_version.version.ToString()
+            # $serverobj.KB = $exchange_product.KB
             $serverobj.Edition = $server.Edition
             $serverobj.UpTime = $uptime
             $serverobj.Connectivity = "Passed"
@@ -563,7 +624,7 @@ Function Get-ServerHealth ($serverlist) {
 }
 
 Function Get-ServerHealthReport ($serverhealthinfo) {
-    ': Server Health Report... ' | Out-Default
+    'Server Health Report... ' | Say
     $mResult = "<tr><td>Server Health Status</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -572,9 +633,9 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
     $mbody += '<table id="SectionLabels"><tr><th class="data">Server Health Status</th></tr></table>'
     $mbody += '<table id="data">'
     # $mbody += '<tr><th>Server</th><th>Version / Edition</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
-    $mbody += '<tr><th>Server Name</th><th>Exchange Server</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
+    $mbody += '<tr><th>Server Name</th><th>Product</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
     foreach ($server in $serverhealthinfo) {
-        $mbody += "<tr><td>$($server.server)</td><td>Name: $($server.ProductName)<br/>Build: $($server.BuildNumber) [$($server.KB)]<br/>Edition: $($server.Edition)</td><td>$($server.ADSite)</td>"
+        $mbody += "<tr><td>$($server.server)</td><td>Name: $($server.ProductName)<br/>Build: $($server.BuildNumber)<br/>Edition: $($server.Edition)</td><td>$($server.ADSite)</td>"
         #Uptime
         if ($server.UpTime -lt 24) {
             #$errString += "<tr><td>Server Up Time</td></td><td>$($server.server) - up time [$($server.Uptime)] is less than 24 hours</td></tr>"
@@ -640,7 +701,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
 }
 
 Function Get-DatabaseCopyStatus ($mailboxdblist) {
-    ': Mailbox Database Copy Status Check... ' | Out-Default
+    'Mailbox Database Copy Status Check... ' | Say
     $stats_collection = @()
 
     foreach ($db in $mailboxdblist) {
@@ -675,7 +736,7 @@ Function Get-DatabaseCopyStatus ($mailboxdblist) {
 }
 
 Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
-    ': Mailbox Database Copy Status... ' | Out-Default
+    'Mailbox Database Copy Status... ' | Say
     $mResult = "<tr><td>Mailbox Database Copy Status</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -752,17 +813,17 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
 }
 
 Function Get-ExServerComponent ($exServerList) {
-    ': Server Component State... ' | Out-Default
+    'Server Component State... ' | Say
     foreach ($exServer in $exServerList) {
         #$stats_collection += (Get-ServerComponentState $exServer | Where-Object {$_.State -ne 'Active'} | Select-Object Identity,Component,State)
-        $stats_collection += (Get-ServerComponentState $exServer | Where-Object { $_.Component -notin $IgnoreComponent } | Select-Object Identity, Component, State)
+        $stats_collection += (Get-ServerComponentState $exServer | Where-Object { $_.Component -notin $Ignore_Server_Component } | Select-Object Identity, Component, State)
     }
 
     return $stats_collection
 }
 
 Function Get-QueueReport ($queueInfo) {
-    ': Mail Queue Report... ' | Out-Default
+    'Mail Queue Report... ' | Say
     $mResult = "<tr><td>Mail Queue</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -794,7 +855,7 @@ Function Get-QueueReport ($queueInfo) {
 }
 
 Function Get-ReplicationReport ($replInfo) {
-    ': Replication Health Report... ' | Out-Default
+    'Replication Health Report... ' | Say
     $mResult = "<tr><td>DAG Members Replication</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -828,7 +889,7 @@ Function Get-ReplicationReport ($replInfo) {
 
 Function Get-ServerComponentStateReport ($serverComponentStateInfo) {
 
-    ': Server Component State... ' | Out-Default
+    'Server Component State... ' | Say
     $mResult = "<tr><td>Server Component State</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -860,7 +921,7 @@ Function Get-ServerComponentStateReport ($serverComponentStateInfo) {
 }
 
 Function Get-DiskReport ($diskinfo) {
-    ': Disk Space Report... ' | Out-Default
+    'Disk Space Report... ' | Say
     $mResult = "<tr><td>Disk Space</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -893,7 +954,7 @@ Function Get-DiskReport ($diskinfo) {
 }
 
 Function Get-MdbReport ($dblist) {
-    ': Mailbox Database Report... ' | Out-Default
+    'Mailbox Database Report... ' | Say
     $mResult = "<tr><td>Mailbox Database Status</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody = @()
@@ -904,36 +965,36 @@ Function Get-MdbReport ($dblist) {
         #$dbDetails = Get-MailboxDatabase $db.Name
         if ($db.mounted -eq $true) {
             #Calculate backup age----------------------------------------------------------
-            if ($db.LastFullBackup -ne '') {
-                $lastfullbackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastFullBackup
-                $lastfullbackupelapsed = New-TimeSpan -Start $db.LastFullBackup
+            if ($db.LastFullBackup) {
+                $LastFullBackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastFullBackup
+                $LastFullBackupElapsed = New-TimeSpan -Start $db.LastFullBackup
             }
             Else {
-                $lastfullbackupelapsed = ''
-                $lastfullbackup = '[NO DATA]'
+                $LastFullBackupElapsed = ''
+                $LastFullBackup = '[NO DATA]'
             }
 
-            if ($db.LastIncrementalBackup -ne '') {
-                $lastincrementalbackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastIncrementalBackup
-                $lastincrementalbackupelapsed = New-TimeSpan -Start $db.LastIncrementalBackup
+            if ($db.LastIncrementalBackup) {
+                $LastIncrementalBackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastIncrementalBackup
+                $LastIncrementalBackupElapsed = New-TimeSpan -Start $db.LastIncrementalBackup
             }
             Else {
-                $lastincrementalbackupelapsed = ''
-                $lastincrementalbackup = '[NO DATA]'
+                $LastIncrementalBackupElapsed = ''
+                $LastIncrementalBackup = '[NO DATA]'
             }
 
-            if ($t_lastfullbackup -eq 0) {
+            if ($t_Last_Full_Backup_Age_Day -eq 0) {
                 [int]$full_backup_age = -1
             }
             else {
-                [int]$full_backup_age = $lastfullbackupelapsed.totaldays
+                [int]$full_backup_age = $LastFullBackupElapsed.totaldays
             }
 
-            if ($t_lastincrementalbackup -eq 0) {
+            if ($t_Last_Incremental_Backup_Age_Day -eq 0) {
                 [int]$incremental_backup_age = -1
             }
             else {
-                [int]$incremental_backup_age = $lastincrementalbackupelapsed.totaldays
+                [int]$incremental_backup_age = $LastIncrementalBackupElapsed.totaldays
             }
             #-------------------------------------------------------------------------------
             $mbody += '<tr>'
@@ -957,24 +1018,24 @@ Function Get-MdbReport ($dblist) {
             $mbody += '<td>' + $db.EDBFreeSpace + '<br />' + $db.LogFreeSpace + '</td>'
             $mbody += '<td>' + $db.DatabaseSize + '</td><td>' + $db.AvailableNewMailboxSpace + '</td><td>' + $db.ActiveMailboxCount + '</td><td>' + $db.DisconnectedMailboxCount + '</td><td>' + $db.TotalItemSize + '</td><td>' + $db.TotalDeletedItemSize + '</td>'
 
-            if ($full_backup_age -gt $t_lastfullbackup) {
-                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$lastfullbackup] is OLDER than $($t_lastfullbackup) Day(s)</td></tr>"
-                $mbody += '<td class = "bad">' + $lastfullbackup + '</td>'
+            if ($full_backup_age -gt $t_Last_Full_Backup_Age_Day) {
+                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$LastFullBackup] is OLDER than $($t_Last_Full_Backup_Age_Day) Day(s)</td></tr>"
+                $mbody += '<td class = "bad">' + $LastFullBackup + '</td>'
             }
-            elseif ($lastfullbackup -eq '[NO DATA]' -and $t_lastfullbackup -ne 0) {
-                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$lastfullbackup] is OLDER than $($t_lastfullbackup) Day(s)</td></tr>"
-                $mbody += '<td class = "bad">' + $lastfullbackup + '</td>'
+            elseif ($LastFullBackup -eq '[NO DATA]' -and $t_Last_Full_Backup_Age_Day -ne 0) {
+                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$LastFullBackup] is OLDER than $($t_Last_Full_Backup_Age_Day) Day(s)</td></tr>"
+                $mbody += '<td class = "bad">' + $LastFullBackup + '</td>'
             }
             Else {
-                $mbody += '<td class = "good">' + $lastfullbackup + '</td>'
+                $mbody += '<td class = "good">' + $LastFullBackup + '</td>'
             }
 
-            if ($incremental_backup_age -gt $t_lastincrementalbackup) {
-                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last incremental backup date [$lastincrementalbackup] is OLDER than $($t_lastincrementalbackup) Day(s)</td></tr>"
-                $mbody += '<td class = "bad">' + $lastincrementalbackup + '</td>'
+            if ($incremental_backup_age -gt $t_Last_Incremental_Backup_Age_Day) {
+                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last incremental backup date [$LastIncrementalBackup] is OLDER than $($t_Last_Incremental_Backup_Age_Day) Day(s)</td></tr>"
+                $mbody += '<td class = "bad">' + $LastIncrementalBackup + '</td>'
             }
             Else {
-                $mbody += '<td class = "good"> ' + $lastincrementalbackup + '</td>'
+                $mbody += '<td class = "good"> ' + $LastIncrementalBackup + '</td>'
             }
 
             $mbody += '</td><td>' + $db.BackupInProgress + '</td>'
@@ -999,7 +1060,7 @@ Function Get-MdbReport ($dblist) {
 }
 
 Function Get-PdbReport ($dblist) {
-    ': Public Folder Database Report... ' | Out-Default
+    'Public Folder Database Report... ' | Say
     $mResult = "<tr><td>Public Folder Database Status</td><td class = ""good"">Passed</td></tr>"
     $testFailed = 0
     $mbody += '<table id="SectionLabels"><tr><th class="data">Public Folder Database</th></tr></table>'
@@ -1007,25 +1068,25 @@ Function Get-PdbReport ($dblist) {
     ForEach ($db in $dblist) {
         if ($db.Mounted -eq $true) {
             #Calculate backup age----------------------------------------------------------
-            if ($db.LastFullBackup -ne '') {
-                $lastfullbackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastFullBackup
-                $lastfullbackupelapsed = New-TimeSpan -Start $db.LastFullBackup
+            if ($db.LastFullBackup) {
+                $LastFullBackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastFullBackup
+                $LastFullBackupElapsed = New-TimeSpan -Start $db.LastFullBackup
             }
             Else {
-                $lastfullbackupelapsed = ''
-                $lastfullbackup = '[NO DATA]'
+                $LastFullBackupElapsed = ''
+                $LastFullBackup = '[NO DATA]'
             }
 
-            if ($db.LastIncrementalBackup -ne '') {
-                $lastincrementalbackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastIncrementalBackup
-                $lastincrementalbackupelapsed = New-TimeSpan -Start $db.LastIncrementalBackup
+            if ($db.LastIncrementalBackup) {
+                $LastIncrementalBackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastIncrementalBackup
+                $LastIncrementalBackupElapsed = New-TimeSpan -Start $db.LastIncrementalBackup
             }
             Else {
-                $lastincrementalbackupelapsed = ''
-                $lastincrementalbackup = '[NO DATA]'
+                $LastIncrementalBackupElapsed = ''
+                $LastIncrementalBackup = '[NO DATA]'
             }
-            [int]$full_backup_age = $lastfullbackupelapsed.totaldays
-            [int]$incremental_backup_age = $lastincrementalbackupelapsed.totaldays
+            [int]$full_backup_age = $LastFullBackupElapsed.totaldays
+            [int]$incremental_backup_age = $LastIncrementalBackupElapsed.totaldays
             #-------------------------------------------------------------------------------
             $mbody += '<tr>'
             $mbody += '<td>' + $db.Name + '</td>'
@@ -1039,20 +1100,20 @@ Function Get-PdbReport ($dblist) {
 
             $mbody += '<td>' + $db.MountedOnServer + '</td><td>' + $db.DatabaseSize + '</td><td>' + $db.AvailableNewMailboxSpace + '</td>'
 
-            if ($full_backup_age -gt $t_lastfullbackup) {
-                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$lastfullbackup] is OLDER than $($t_lastfullbackup) days</td></tr>"
-                $mbody += '<td class = "bad">' + $lastfullbackup + '</td>'
+            if ($full_backup_age -gt $t_Last_Full_Backup_Age_Day) {
+                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last full backup date [$LastFullBackup] is OLDER than $($t_Last_Full_Backup_Age_Day) days</td></tr>"
+                $mbody += '<td class = "bad">' + $LastFullBackup + '</td>'
             }
             Else {
-                $mbody += '<td class = "good">' + $lastfullbackup + '</td>'
+                $mbody += '<td class = "good">' + $LastFullBackup + '</td>'
             }
 
-            if ($incremental_backup_age -gt $t_lastincrementalbackup) {
-                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last incremental backup date [$lastfullbackup] is OLDER than $($t_lastincrementalbackup) days</td></tr>"
-                $mbody += '<td class = "bad">' + $lastincrementalbackup + '</td>'
+            if ($incremental_backup_age -gt $t_Last_Incremental_Backup_Age_Day) {
+                $errString += "<tr><td>Database Backup</td></td><td>$($db.Name) - last incremental backup date [$LastIncrementalBackup] is OLDER than $($t_Last_Incremental_Backup_Age_Day) days</td></tr>"
+                $mbody += '<td class = "bad">' + $LastIncrementalBackup + '</td>'
             }
             Else {
-                $mbody += '<td class = "good"> ' + $lastincrementalbackup + '</td>'
+                $mbody += '<td class = "good"> ' + $LastIncrementalBackup + '</td>'
             }
             $mbody += '</td><td>' + $db.BackupInProgress + '</td>'
 
@@ -1076,7 +1137,7 @@ Function Get-PdbReport ($dblist) {
 }
 
 Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
-    ': CPU and Memory Report... ' | Out-Default
+    'CPU and Memory Report... ' | Say
     $mResult = "<tr><td>CPU and Memory Usage</td><td class = ""good"">Passed</td></tr>"
     $mbody = @()
     $errString = @()
@@ -1094,20 +1155,20 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
             $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
         }
 
-        if ([int]$cpuAndMemData.CPU_Usage -lt $t_cpuUsage) {
+        if ([int]$cpuAndMemData.CPU_Usage -lt $t_CPU_Usage_Percent) {
             $mbody += "<tr><td></td><td class = ""good"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
         }
-        elseif ([int]$cpuAndMemData.CPU_Usage -ge $t_cpuUsage) {
+        elseif ([int]$cpuAndMemData.CPU_Usage -ge $t_CPU_Usage_Percent) {
             $mbody += "<tr><td></td><td class = ""bad"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
-            $errString += "<tr><td>CPU</td></td><td>$($currentServer) - $($cpuAndMemData.CPU_Usage)% CPU Load IS OVER the $($t_cpuUsage)% threshold </td></tr>"
+            $errString += "<tr><td>CPU</td></td><td>$($currentServer) - $($cpuAndMemData.CPU_Usage)% CPU Load IS OVER the $($t_CPU_Usage_Percent)% threshold </td></tr>"
         }
 
 
-        if ([int]$cpuAndMemData.Memory_Used_Percent -lt $t_ramUsage) {
+        if ([int]$cpuAndMemData.Memory_Used_Percent -lt $t_RAM_Usage_Percent) {
             $mbody += "<td class = ""good"">$($cpuAndMemData.Memory_Used_Percent)%</td><td>$($Top_Memory_Consumers)</td></tr>"
         }
-        elseif ([int]$cpuAndMemData.Memory_Used_Percent -ge $t_ramUsage) {
-            $errString += "<td>Memory</td></td><td>$($currentServer) - $($cpuAndMemData.Memory_Used_Percent)% Memory Load IS OVER the $($t_ramUsage)% threshold </td></tr>"
+        elseif ([int]$cpuAndMemData.Memory_Used_Percent -ge $t_RAM_Usage_Percent) {
+            $errString += "<td>Memory</td></td><td>$($currentServer) - $($cpuAndMemData.Memory_Used_Percent)% Memory Load IS OVER the $($t_RAM_Usage_Percent)% threshold </td></tr>"
             $mbody += "<td class = ""bad"">$($cpuAndMemData.Memory_Used_Percent)%</td><td>$($Top_Memory_Consumers)</td></tr>"
         }
     }
@@ -1120,7 +1181,7 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
 #SCRIPT BEGIN---------------------------------------------------------------
 
 #Get-List of Exchange Servers and assign to array----------------------------
-': Building List of Servers - excluding Edge' | Out-Default
+'Building List of Servers - excluding Edge' | Say
 $temp_ExServerList = Get-ExchangeServer | Where-Object { $_.ServerRole -notmatch 'Edge' } | Sort-Object Name
 $dagMemberCount = Get-MailboxServer | Where-Object { $_.DatabaseAvailabilityGroup }
 if (!$dagMemberCount) { $dagMemberCount = @() }
@@ -1128,7 +1189,7 @@ if (!$dagMemberCount) { $dagMemberCount = @() }
 #Get rid of excluded Servers
 $ExServerList = @()
 foreach ($ExServer in $temp_ExServerList) {
-    if ($IgnoreServer -notcontains $ExServer.Name) {
+    if ($Ignore_Server_Name -notcontains $ExServer.Name) {
         $exServerList += $ExServer
     }
 }
@@ -1141,14 +1202,14 @@ $transportServers = @()
 $transportServers += $nonEx2010transportServers + $Ex2010TransportServers
 #----------------------------------------------------------------------------
 #Get-List of Mailbox Database and assign to array----------------------------
-if ($RunMdbReport -eq $true -OR $RunDBCopyReport -eq $true) {
-    ': Building List of Mailbox Database' | Out-Default
+if ($Mailbox_Database -eq $true -OR $Database_Copy -eq $true) {
+    'Building List of Mailbox Database' | Say
     $temp_ExMailboxDBList = Get-MailboxDatabase -Status | Where-Object { $_.Recovery -eq $False }
     #Get rid of excluded Mailbox Database
     $ExMailboxDBList = @()
     $activeServers = @()
     foreach ($ExMailboxDB in $temp_ExMailboxDBList) {
-        if ($IgnoreDatabase -notcontains $ExMailboxDB.Name) {
+        if ($Ignore_MB_Database -notcontains $ExMailboxDB.Name) {
             $ExMailboxDBList += $ExMailboxDB
             $activeServers += ($ExMailboxDB.MountedOnServer).Split(".")[0]
         }
@@ -1157,15 +1218,15 @@ if ($RunMdbReport -eq $true -OR $RunDBCopyReport -eq $true) {
 }
 #----------------------------------------------------------------------------
 #Get-List of Public Folder Database and assign to array----------------------
-if ($RunPdbReport -eq $true) {
-    ': Building List of Public Folder Database' | Out-Default
+if ($Public_Folder_Database -eq $true) {
+    'Building List of Public Folder Database' | Say
     $temp_ExPFDBList = Get-PublicFolderDatabase -Status | Where-Object { $_.Recovery -eq $False }
     if (!$temp_ExPFDBList) { $temp_ExPFDBList = @() }
     $ExPFDBList = @()
 
     #Get rid of excluded PF Database
     foreach ($ExPFDB in $temp_ExPFDBList) {
-        if ($IgnorePFDatabase -notcontains $ExPFDB.Name) {
+        if ($Ignore_PF_Database -notcontains $ExPFDB.Name) {
             $ExPFDBList += $ExPFDB
         }
     }
@@ -1174,63 +1235,61 @@ if ($RunPdbReport -eq $true) {
 #----------------------------------------------------------------------------
 
 #Begin Data Extraction-------------------------------------------------------
-'==================================================================' | Out-Default
-': Begin Data Extraction' | Out-Default
-if ($RunCPUandMemoryReport -eq $true) { $cpuHealthData = Get-CPUAndMemoryLoad($ExServerList) ; $testCount++ }
-if ($RunServerHealthReport -eq $true) { $serverhealthdata = Get-ServerHealth($ExServerList) ; $testCount++ }
-if ($RunComponentReport -eq $true -AND $nonEx2010.count -gt 0) { $componentHealthData = Get-ExServerComponent ($nonEx2010) ; $testCount++ }
-if ($RunMdbReport -eq $true) { $mdbdata = Get-MdbStatistic ($ExMailboxDBList) | Sort-Object Name ; $testCount++ }
-if ($RunPdbReport -eq $true -AND $ExPFDBList.Count -gt 0) { $pdbdata = Get-PdbStatistic ($ExPFDBList) ; $testCount++ }
-if ($RunDBCopyReport -eq $true) { $dagCopyData = Get-DatabaseCopyStatus ($ExMailboxDBList) ; $testCount++ }
-if ($RunDAGReplicationReport -eq $true -and $dagMemberCount.count -gt 0) { $repldata = Get-ReplicationHealth ; $testCount++ }
-if ($RunQueueReport -eq $true) { $queueData = Get-MailQueueCount ($transportServers) ; $testCount++ }
-if ($RunDiskReport -eq $true) { $diskdata = Get-DiskSpaceStatistic($ExServerList) ; $testCount++ }
+$hr | Say
+'Begin Data Extraction' | Say
+if ($CPU_and_RAM -eq $true) { $cpuHealthData = Get-CPUAndMemoryLoad($ExServerList) ; }
+if ($Server_Health -eq $true) { $serverhealthdata = Get-ServerHealth($ExServerList) ; }
+if ($Server_Component -eq $true -AND $nonEx2010.count -gt 0) { $componentHealthData = Get-ExServerComponent ($nonEx2010) ; }
+if ($Mailbox_Database -eq $true) { $mdbdata = Get-MdbStatistic ($ExMailboxDBList) | Sort-Object Name ; }
+if ($Public_Folder_Database -eq $true -AND $ExPFDBList.Count -gt 0) { $pdbdata = Get-PdbStatistic ($ExPFDBList) ; }
+if ($Database_Copy -eq $true) { $dagCopyData = Get-DatabaseCopyStatus ($ExMailboxDBList) ; }
+if ($DAG_Replication -eq $true -and $dagMemberCount.count -gt 0) { $repldata = Get-ReplicationHealth ; }
+if ($Mail_Queue -eq $true) { $queueData = Get-MailQueueCount ($transportServers) ; }
+if ($Disk_Space -eq $true) { $diskdata = Get-DiskSpaceStatistic($ExServerList) ; }
 
 #----------------------------------------------------------------------------
 # Build Report --------------------------------------------------------------
-'==================================================================' | Out-Default
-': Create Report' | Out-Default
-if ($RunCPUandMemoryReport -eq $true) {
+$hr | Say
+'Create Report' | Say
+if ($CPU_and_RAM -eq $true) {
     $cpuAndMemoryCheckResult, $cpuError, $cpuResult, $cpuFailed = Get-CPUAndMemoryReport ($cpuHealthData)
     $errSummary += $cpuError
     $testFailed += $cpuFailed
 }
-if ($RunServerHealthReport -eq $true) { $serverhealthreport, $sError, $sResult, $sFailed = Get-ServerHealthReport ($serverhealthdata) ; $errSummary += $sError; $testFailed += $sFailed }
-if ($RunComponentReport -eq $true -AND $nonEx2010.count -gt 0) { $componentHealthReport, $cError, $cResult, $cFailed = Get-ServerComponentStateReport ($componentHealthData) ; $errSummary += $cError; $testFailed += $cFailed }
-if ($RunMdbReport -eq $true) { $mdbreport, $mError, $mdbResult, $mdbFailed = Get-MdbReport ($mdbdata) ; $errSummary += $mError; $testFailed += $mdbFailed }
-if ($RunDBCopyReport -eq $true) { $dbcopyreport, $dbCopyError, $dbResult, $dbFailed = Get-DAGCopyStatusReport ($dagCopyData) ; $errSummary += $dbCopyError; $testFailed += $dbFailed }
-if ($RunDAGReplicationReport -eq $true -and $dagMemberCount.count -gt 0) { $replicationreport, $rError, $rResult, $rFailed = Get-ReplicationReport ($repldata) ; $errSummary += $rError; $testFailed += $rFailed }
-if ($RunPdbReport -eq $true -AND $ExPFDBList.Count -gt 0) { $pdbreport, $pdbError, $pdbResult, $pdbFailed = Get-PdbReport ($pdbdata) ; $errSummary += $pdbError; $testFailed += $pdbFailed }
-if ($RunQueueReport -eq $true) { $queuereport, $qError, $qResult, $qFailed = Get-QueueReport($queueData) ; $errSummary += $qError; $testFailed += $qFailed }
-if ($RunDiskReport -eq $true) { $diskreport, $dError, $dResult, $dFailed = Get-DiskReport ($diskdata) ; $errSummary += $dError; $testFailed += $dFailed }
+if ($Server_Health -eq $true) { $serverhealthreport, $sError, $sResult, $sFailed = Get-ServerHealthReport ($serverhealthdata) ; $errSummary += $sError; $testFailed += $sFailed }
+if ($Server_Component -eq $true -AND $nonEx2010.count -gt 0) { $componentHealthReport, $cError, $cResult, $cFailed = Get-ServerComponentStateReport ($componentHealthData) ; $errSummary += $cError; $testFailed += $cFailed }
+if ($Mailbox_Database -eq $true) { $mdbreport, $mError, $mdbResult, $mdbFailed = Get-MdbReport ($mdbdata) ; $errSummary += $mError; $testFailed += $mdbFailed }
+if ($Database_Copy -eq $true) { $dbcopyreport, $dbCopyError, $dbResult, $dbFailed = Get-DAGCopyStatusReport ($dagCopyData) ; $errSummary += $dbCopyError; $testFailed += $dbFailed }
+if ($DAG_Replication -eq $true -and $dagMemberCount.count -gt 0) { $replicationreport, $rError, $rResult, $rFailed = Get-ReplicationReport ($repldata) ; $errSummary += $rError; $testFailed += $rFailed }
+if ($Public_Folder_Database -eq $true -AND $ExPFDBList.Count -gt 0) { $pdbreport, $pdbError, $pdbResult, $pdbFailed = Get-PdbReport ($pdbdata) ; $errSummary += $pdbError; $testFailed += $pdbFailed }
+if ($Mail_Queue -eq $true) { $queuereport, $qError, $qResult, $qFailed = Get-QueueReport($queueData) ; $errSummary += $qError; $testFailed += $qFailed }
+if ($Disk_Space -eq $true) { $diskreport, $dError, $dResult, $dFailed = Get-DiskReport ($diskdata) ; $errSummary += $dError; $testFailed += $dFailed }
 
-
-
-$mail_body = "<html><head><title>[$($CompanyName)] $($MailSubject) $($today)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
-': Formatting Report' | Out-Default
+$mail_body = "<html><head><title>[$($Company_Name)] $($Email_Subject) $($today)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
+'Formatting Report...' | Say
 $mail_body += $css_string
 $mail_body += '<table id="HeadingInfo">'
-$mail_body += '<tr><th>' + $CompanyName + '<br />' + $MailSubject + '<br />' + $today + '</th></tr>'
+$mail_body += '<tr><th>' + $Company_Name + '<br />' + $Email_Subject + '<br />' + $today + '</th></tr>'
 $mail_body += '</table>'
 
 ##Set Individual Test Results
-$testPassed = $testCount - $testFailed
-$percentPassed = ($testPassed / $testCount) * 100
+$testPassed = $enabledTestCount - $testFailed
+$percentPassed = ($testPassed / $enabledTestCount) * 100
 $percentPassed = [math]::Round($percentPassed)
-if ($testPassed -lt $testCount) { $overAllResult = "FAILED" }
+if ($testPassed -lt $enabledTestCount) { $overAllResult = "FAILED" }
 
 $mail_body += '<table id="SectionLabels">'
 $mail_body += "<tr><th class=""data"">Overall Health: $($percentPassed)% - $($overAllResult)</th></tr></table>"
-$mail_body += '<table id="data"><tr><th>Test</th><th>Result</th></tr>'
-if ($RunCPUandMemoryReport -eq $true) { $mail_body += $cpuResult }
-if ($RunServerHealthReport -eq $true) { $mail_body += $sResult }
-if ($RunComponentReport -eq $true -AND $nonEx2010.count -gt 0) { $mail_body += $cResult }
-if ($RunMdbReport -eq $true) { $mail_body += $mdbResult }
-if ($RunDBCopyReport -eq $true) { $mail_body += $dbResult }
-if ($RunDAGReplicationReport -eq $true -and $dagMemberCount.count -gt 0) { $mail_body += $rResult }
-if ($RunPdbReport -eq $true -AND $ExPFDBList.Count -gt 0) { $mail_body += $pdbResult }
-if ($RunQueueReport -eq $true) { $mail_body += $qResult }
-if ($RunDiskReport -eq $true) { $mail_body += $dResult }
+$mail_body += '<table id="data"><tr><th>Test Items</th><th>Result</th></tr>'
+if ($CPU_and_RAM -eq $true) { $mail_body += $cpuResult }
+if ($Server_Health -eq $true) { $mail_body += $sResult }
+if ($Server_Component -eq $true -AND $nonEx2010.count -gt 0) { $mail_body += $cResult }
+if ($Mailbox_Database -eq $true) { $mail_body += $mdbResult }
+if ($Database_Copy -eq $true) { $mail_body += $dbResult }
+if ($DAG_Replication -eq $true -and $dagMemberCount.count -gt 0) { $mail_body += $rResult }
+if ($Public_Folder_Database -eq $true -AND $ExPFDBList.Count -gt 0) { $mail_body += $pdbResult }
+if ($Mail_Queue -eq $true) { $mail_body += $qResult }
+if ($Disk_Space -eq $true) { $mail_body += $dResult }
 $mail_body += '</table>'
 if ($overAllResult -eq 'FAILED') {
     $mail_body += '<table id="SectionLabels">'
@@ -1240,85 +1299,94 @@ if ($overAllResult -eq 'FAILED') {
     $mail_body += '</table>'
 }
 
-if ($RunCPUandMemoryReport -eq $true) { $mail_body += $cpuAndMemoryCheckResult ; $mail_body += '</table>' }
-if ($RunServerHealthReport -eq $true) { $mail_body += $serverhealthreport ; $mail_body += '</table>' }
-if ($RunComponentReport -eq $true -AND $nonEx2010.count -gt 0) { $mail_body += $componentHealthReport ; $mail_body += '</table>' }
-if ($RunMdbReport -eq $true) { $mail_body += $mdbreport ; $mail_body += '</table>' }
-if ($RunDAGReplicationReport -eq $true) { $mail_body += $replicationreport ; $mail_body += '</table>' }
-if ($RunDBCopyReport -eq $true) { $mail_body += $dbcopyreport ; $mail_body += '</table>' }
-if ($RunPdbReport -eq $true) { $mail_body += $pdbreport ; $mail_body += '</table>' }
-if ($RunQueueReport -eq $true) { $mail_body += $queuereport ; $mail_body += '</table>' }
-if ($RunDiskReport -eq $true) { $mail_body += $diskreport ; $mail_body += '</table>' }
+if ($CPU_and_RAM -eq $true) { $mail_body += $cpuAndMemoryCheckResult ; $mail_body += '</table>' }
+if ($Server_Health -eq $true) { $mail_body += $serverhealthreport ; $mail_body += '</table>' }
+if ($Server_Component -eq $true -AND $nonEx2010.count -gt 0) { $mail_body += $componentHealthReport ; $mail_body += '</table>' }
+if ($Mailbox_Database -eq $true) { $mail_body += $mdbreport ; $mail_body += '</table>' }
+if ($DAG_Replication -eq $true) { $mail_body += $replicationreport ; $mail_body += '</table>' }
+if ($Database_Copy -eq $true) { $mail_body += $dbcopyreport ; $mail_body += '</table>' }
+if ($Public_Folder_Database -eq $true) { $mail_body += $pdbreport ; $mail_body += '</table>' }
+if ($Mail_Queue -eq $true) { $mail_body += $queuereport ; $mail_body += '</table>' }
+if ($Disk_Space -eq $true) { $mail_body += $diskreport ; $mail_body += '</table>' }
 $mail_body += '<p><table id="SectionLabels">'
 $mail_body += '<tr><th>----END of REPORT----</th></tr></table></p>'
 $mail_body += '<p><font size="2" face="Tahoma"><u>Report Paremeters</u><br />'
 $mail_body += '<b>[THRESHOLD]</b><br />'
-$mail_body += 'Last Full Backup: ' + $t_lastfullbackup + ' Day(s)<br />'
-$mail_body += 'Last Incremental Backup: ' + $t_lastincrementalbackup + ' Day(s)<br />'
+$mail_body += 'Last Full Backup: ' + $t_Last_Full_Backup_Age_Day + ' Day(s)<br />'
+$mail_body += 'Last Incremental Backup: ' + $t_Last_Incremental_Backup_Age_Day + ' Day(s)<br />'
 $mail_body += 'Mail Queue: ' + $t_mQueue + '<br />'
 $mail_body += 'Copy Queue: ' + $t_copyQueue + '<br />'
 $mail_body += 'Replay Queue: ' + $t_replayQueue + '<br />'
 $mail_body += 'Disk Space Critical: ' + $t_DiskBadPercent + ' (%) <br />'
-$mail_body += 'CPU: ' + $t_cpuUsage + ' (%) <br />'
-$mail_body += 'Memory: ' + $t_ramUsage + ' (%) <br /><br />'
+$mail_body += 'CPU: ' + $t_CPU_Usage_Percent + ' (%) <br />'
+$mail_body += 'Memory: ' + $t_RAM_Usage_Percent + ' (%) <br />'
 
-if ($SendReportViaEmail) {
-    $mail_body += '<b>[MAIL]</b><br />'
-    $mail_body += 'SMTP Server: ' + $MailServer + '<br />'
-    $mail_body += 'Recipients: ' + ($MailTo -join ';') + '<br /><br />'
+if ($Send_Email_Report) {
+    $mail_body += '<br /><b>[MAIL]</b><br />'
+    $mail_body += 'SMTP Server: ' + $SMTP_Server + '<br />'
+    $mail_body += 'To: ' + ($To_Address -join ';') + '<br />'
+    if ($Cc_Address) {
+        $mail_body += 'Cc: ' + ($Cc_Address -join ';') + '<br />'
+    }
+    if ($bcc_Address) {
+        $mail_body += 'Cc: ' + ($bcc_Address -join ';') + '<br />'
+    }
 }
 
-$mail_body += '<b>[REPORT]</b><br />'
+$mail_body += '<br /><b>[REPORT]</b><br />'
 $mail_body += 'Generated from Server: ' + ($env:computername) + '<br />'
 $mail_body += 'Script File: ' + $MyInvocation.MyCommand.Definition + '<br />'
 $mail_body += 'Config File: ' + (Resolve-Path $configFile).Path + '<br />'
-$mail_body += 'Report File: ' + (Resolve-Path $reportfile).Path + '<br /><br />'
+$mail_body += 'Report File: ' + (Resolve-Path $Report_File_Path).Path + '<br />'
 
-$mail_body += '<b>[EXCLUSIONS]</b><br />'
-$mail_body += 'Excluded Servers: ' + (@($config.exclusions.IgnoreServer) -join ';') + '<br />'
-$mail_body += 'Excluded Components: ' + (@($config.exclusions.IgnoreComponent) -join ';') + '<br />'
-$mail_body += 'Excluded Mailbox Database: ' + (@($config.exclusions.IgnoreDatabase) -join ';') + '<br />'
-$mail_body += 'Excluded Public Database: ' + (@($config.exclusions.IgnorePFDatabase) -join ';') + '<br /><br />'
+$mail_body += '<br /><b>[EXCLUSIONS]</b><br />'
+$mail_body += 'Excluded Servers: ' + (@($config.Exclusion.Ignore_Server_Name) -join ';') + '<br />'
+$mail_body += 'Excluded Components: ' + (@($config.Exclusion.Ignore_Server_Component) -join ';') + '<br />'
+$mail_body += 'Excluded Mailbox Database: ' + (@($config.Exclusion.Ignore_MB_Database) -join ';') + '<br />'
+$mail_body += 'Excluded Public Database: ' + (@($config.Exclusion.Ignore_PF_Database) -join ';') + '<br />'
 $mail_body += '</p><p>'
 $mail_body += '<a href="' + $script_info.ProjectUri.OriginalString + '">' + $script_info.Name + ' ' + $script_info.Version.ToString() + '</a></p>'
 $mail_body += '</html>'
 # $mbody = $mbox -replace "&lt;", "<"
 # $mbody = $mbox -replace "&gt;", ">"
-$mail_body | Out-File $reportfile
-': HTML Report saved to file -' + $reportfile | Out-Default
+$mail_body | Out-File $Report_File_Path
+'HTML Report saved to file - ' + $Report_File_Path | Say
 #----------------------------------------------------------------------------
 # Mail Parameters------------------------------------------------------------
-# Add CC= and/or BCC= lines if you want to add recipients for CC and BCC
 $params = @{
     Body       = $mail_body
     BodyAsHtml = $true
-    Subject    = "[$($CompanyName)] $($MailSubject) $($today)"
-    From       = $MailSender
-    SmtpServer = $MailServer
-    UseSsl     = $config.mailAndReportParameters.SSLEnabled
-    Port       = $config.mailAndReportParameters.Port
+    Subject    = "[$($Company_Name)] $($Email_Subject) $($today)"
+    From       = $Sender_Address
+    SmtpServer = $SMTP_Server
+    UseSsl     = $SSL_Enabled
+    Port       = $Port
 }
 
-if ($MailTo) { $params.Add('To', $MailTo) }
-if ($MailCc) { $params.Add('Cc', $MailCc) }
-if ($MailBcc) { $params.Add('Bcc', $MailBcc) }
+if ($To_Address) { $params.Add('To', $To_Address) }
+if ($Cc_Address) { $params.Add('Cc', $Cc_Address) }
+if ($Bcc_Address) { $params.Add('Bcc', $Bcc_Address) }
 
 #----------------------------------------------------------------------------
 # Send Report----------------------------------------------------------------
-if ($SendReportViaEmail -eq $true) { ': Sending Report' ; Send-MailMessage @params }
+if ($Send_Email_Report -eq $true) { 'Sending Report...' | Say ; Send-MailMessage @params }
 #----------------------------------------------------------------------------
-"" | Out-Default
-"======================================" | Out-Default
-"Enabled Tests: $($testCount)" | Out-Default
-"Failed: $($testFailed)" | Out-Default
-"Passed: $($testPassed) [$($percentPassed)%]" | Out-Default
-"Overall Result: $($overAllResult)" | Out-Default
+# "" | Say
+$hr | Say
+"Enabled Tests: $($enabledTestCount) [of $($availableTestCount)]" | Say
+"Failed: $($testFailed)" | Say
+"Passed: $($testPassed) [$($percentPassed)%]" | Say
+switch ($overAllResult) {
+    'PASSED' { "Overall Result: $overAllResult" | Say -Color Green }
+    'FAILED' { "Overall Result: $overAllResult" | Say -Color Yellow }
+}
 
-"======================================" | Out-Default
-"" | Out-Default
+# "Overall Result: $($overAllResult)" | Say
+
+"======================================" | Say
+"" | Say
 
 #SCRIPT END------------------------------------------------------------------
-#https://www.lazyexchangeadmin.com/2015/03/database-backup-and-disk-space-report.html
 if ($enableDebug) { Stop-Transcript }
 
 
