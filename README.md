@@ -9,8 +9,8 @@ PowerShell script to extract and report Exchange server health statistics.
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
   - [Branding](#branding)
   - [TestItem](#testitem)
-  - [ReportOptions](#reportoptions)
-  - [Thresholds](#thresholds)
+  - [Output](#output)
+  - [Threshold](#threshold)
   - [Mail](#mail)
   - [Exclusion](#exclusion)
 - [Usage Examples](#usage-examples)
@@ -47,45 +47,51 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
 
 ```powershell
 @{
-    ReportOptions           = @{
-        CPU_and_RAM   = $true
-        Server_Health   = $true
-        Mailbox_Database           = $true
-        Server_Component      = $true
-        Public_Folder_Database            = $true
-        DAG_Replication = $true
-        Mail_Queue          = $true
-        Disk_Space           = $true
-        Database_Copy         = $true
-        Send_Email_Report      = $false
-        Report_File_Path              = "MG_PoshLab_Exchange.html"
+    Branding  = @{
+        Company_Name = 'MG PoshLab'
     }
-    Thresholds              = @{
-        Last_Full_Backup_Age_Day        = 0
-        Last_Incremental_Backup_Age_Day = 0
+    TestItem  = @{
+        CPU_and_RAM            = $true
+        Server_Health          = $true
+        Mailbox_Database       = $true
+        Server_Component       = $true
+        Public_Folder_Database = $false
+        DAG_Replication        = $true
+        Mail_Queue             = $true
+        Disk_Space             = $true
+        Database_Copy          = $true
+    }
+    Output    = @{
+        Report_File_Path          = "C:\Scripts\ExchangeServiceHealth\report.html"
+        Transcript_File_Path      = "C:\Scripts\ExchangeServiceHealth\transcript.log"
+        Enable_Transcript_Logging = $true
+    }
+    Threshold = @{
+        Last_Full_Backup_Age_Day        = 7
+        Last_Incremental_Backup_Age_Day = 1
         Disk_Space_Free_Percent         = 12
-        Mail_Queue_Count        = 20
-        Copy_Queue_Length       = 10
-        Replay_Queue_Length     = 10
-        CPU_Usage_Percent              = 60
-        RAM_Usage_Percent              = 80
+        Mail_Queue_Count                = 20
+        Copy_Queue_Length               = 10
+        Replay_Queue_Length             = 10
+        CPU_Usage_Percent               = 60
+        RAM_Usage_Percent               = 80
     }
-    Mail = @{
-        Company_Name = "MG PoshLab"
-        Email_Subject = "Exchange Service Health Report"
-        SMTP_Server  = "mail.mg.poshlab.xyz"
-        Sender_Address  = "MG PostMaster <exchange-Admin@mg.poshlab.xyz>"
-        To_Address      = @('june@poshlab.xyz', 'tito.castillote-jr@dxc.com', 'june.castillote@gmail.com')
-        Cc_Address      = @()
-        Bcc_Address     = @()
-        SSL_Enabled  = $false
-        Port        = 25
+    Mail      = @{
+        Send_Email_Report = $true
+        Email_Subject     = "Exchange Service Health Report"
+        SMTP_Server       = "mail.server.address.here"
+        Sender_Address    = "Exchange Admin <exchange-Admin@domain.tld>"
+        To_Address        = @('admin1@domain.tld')
+        Cc_Address        = @()
+        Bcc_Address       = @()
+        SSL_Enabled       = $false
+        Port              = 25
     }
-    Exclusions              = @{
-        Ignore_Server_Name     = @()
-        Ignore_MB_Database   = @()
-        Ignore_PF_Database = @()
-        Server_Component  = @('ForwardSyncDaemon', 'ProvisioningRps')
+    Exclusion = @{
+        Ignore_Server_Name      = @()
+        Ignore_MB_Database      = @()
+        Ignore_PF_Database      = @()
+        Ignore_Server_Component = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
 }
 ```
@@ -110,23 +116,13 @@ This section list the tests that can be toggled by changing values with `$true` 
 - `Mail_Queue` : Get mail queue count
 - `Disk_Space` : Get server disk space statistics
 
-### ReportOptions
+### Output
 
-This section can be toggled by changing values with `$true` or `$false`.
+- `Report_File_Path` : File path and name of the HTML Report
+- `Transcript_File_Path` : File path and name of the transcript
+- `Enable_Transcript_Logging` : Specify whether to enable transcript logging
 
-- `Server_Health` - Run test and report the Server Health status
-- `RunMdbReport` - Mailbox Database test and report
-- `Server_Component` - Server Components check
-- `Public_Folder_Database` - For checking the Public Folder database(s)
-- `DAG_Replication` - Check and test replication status
-- `Mail_Queue` - Inspect mail queue count
-- `Disk_Space` - Disk space report for each server
-- `Database_Copy` - Checking the status of the Database Copies
-- `Send_Email_Report` - Option to send the HTML report via email
-- `Report_File_Path` - File path and name of the HTML Report
-- `Transcript_File_Path` - File path and name of the HTML Report
-
-### Thresholds
+### Threshold
 
 This section defines at which levels the script will report a problem for each check item.
 
@@ -143,7 +139,6 @@ This section defines at which levels the script will report a problem for each c
 
 This section specifies the mail parameters.
 
-- `Company_Name` - The name of the organization or company that you want to appear in the banner of the report.
 - `Email_Subject` - Subject of the email report.
 - `SMTP_Server` - The SMTP Relay server.
 - `Sender_Address` - Mail sender address.
@@ -160,16 +155,17 @@ This section is where the exclusions can be defined.
 - `Ignore_Server_Name` - List of servers to be ignored by the script.
 - `Ignore_MB_Database` - List of Mailbox Database to be ignored by the script.
 - `Ignore_PF_Database` - List of Public Folder Database to be ignored by the script.
-- `Server_Component` - List of Server Components to be ignored by the script.
+- `Ignore_Server_Component` - List of Server Components to be ignored by the script.
 
 ## Usage Examples
 
-> NOTE: Use this script only in Exchange Management Shell session.
+> NOTE: Use this script only in Exchange Management Shell or Remote PowerShell session to the Exchange Server.
 
 ### Example 1: Running Manually in Exchange Management Shell
 
 ```PowerShell
-.\Get-ExchangeServerHealth.ps1 -ConfigFile .\config.psd1 -EnableDebug
+.\Get-ExchangeServerHealth.ps1 -ConfigFile .\config.psd1
 ```
 
-The above example runs the script using the `config.psd1` configuration file on the same directory. The transcript will be saved to the `debugLog.txt`
+This example runs the script using the `config.psd1` configuration file on the same directory.
+ ![Example 1](resource/images/Example_01.png)
