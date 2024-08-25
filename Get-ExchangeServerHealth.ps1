@@ -44,13 +44,32 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory)]
-    [string]$ConfigFile,
-    [Parameter()]
-    [switch]$EnableDebug
+    [string]$ConfigFile
+    # [Parameter()]
+    # [switch]$EnableDebug
 )
-$script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
-$script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-if ($enableDebug) { Start-Transcript -Path ($script_root + "\debugLog.txt") }
+
+
+Function LogEnd {
+    $txnLog = ""
+    Do {
+        try {
+            Stop-Transcript | Out-Null
+        }
+        catch [System.InvalidOperationException] {
+            $txnLog = "stopped"
+        }
+    } While ($txnLog -ne "stopped")
+}
+
+Function LogStart {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$logPath
+    )
+    LogEnd
+    Start-Transcript $logPath -Force | Out-Null
+}
 
 Function BuildNumberToName {
     param (
@@ -132,15 +151,23 @@ Function Say {
     }
 }
 
+$script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
+$script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+# if ($enableDebug) { Start-Transcript -Path ($script_root + "\debugLog.txt") }
+
 #Import Configuration File
 if ((Test-Path $configFile) -eq $false) {
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Say
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt
-    if ($enableDebug) { Stop-Transcript }
+    # if ($enableDebug) { Stop-Transcript }
     return $null
 }
 
 $config = Import-PowerShellDataFile $configFile
+
+if ($config.Output.Enable_Transcript_Logging) {
+    LogStart $config.Output.Transcript_File_Path
+}
 
 # Start Script
 $hr = "=" * ($script_info.ProjectUri.OriginalString.Length)
@@ -291,6 +318,7 @@ $Disk_Space = $config.TestItem.Disk_Space
 
 # Output
 $Report_File_Path = (New-Item -ItemType File -Path $config.Output.Report_File_Path -Force).FullName
+$Transcript_File_Path = $config.Output.Transcript_File_Path
 
 #Mail settings
 $Send_Email_Report = $config.Mail.Send_Email_Report
@@ -1339,6 +1367,10 @@ $mail_body += 'Script File: ' + $MyInvocation.MyCommand.Definition + '<br />'
 $mail_body += 'Config File: ' + (Resolve-Path $configFile).Path + '<br />'
 $mail_body += 'Report File: ' + (Resolve-Path $Report_File_Path).Path + '<br />'
 
+if ($config.Output.Enable_Transcript_Logging) {
+    $mail_body += 'Transcript File: ' + (Resolve-Path $Transcript_File_Path).Path + '<br />'
+}
+
 $mail_body += '<br /><b>[EXCLUSIONS]</b><br />'
 $mail_body += 'Excluded Servers: ' + (@($config.Exclusion.Ignore_Server_Name) -join ';') + '<br />'
 $mail_body += 'Excluded Components: ' + (@($config.Exclusion.Ignore_Server_Component) -join ';') + '<br />'
@@ -1387,6 +1419,6 @@ switch ($overAllResult) {
 "" | Say
 
 #SCRIPT END------------------------------------------------------------------
-if ($enableDebug) { Stop-Transcript }
+if ($config.Output.Enable_Transcript_Logging) { LogEnd }
 
 
