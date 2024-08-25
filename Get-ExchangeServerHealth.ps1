@@ -45,11 +45,9 @@
 param (
     [Parameter(Mandatory)]
     [string]$ConfigFile
-    # [Parameter()]
-    # [switch]$EnableDebug
 )
 
-
+#Region Functions
 Function LogEnd {
     $txnLog = ""
     Do {
@@ -127,7 +125,6 @@ Function GetExchangeServerVerion {
 Function Say {
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        # [ValidateNotNullOrEmpty()]
         $Text,
 
         [Parameter()]
@@ -151,15 +148,17 @@ Function Say {
     }
 }
 
+#EndRegion Functions
+
+# Start Script
+
 $script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-# if ($enableDebug) { Start-Transcript -Path ($script_root + "\debugLog.txt") }
 
 #Import Configuration File
 if ((Test-Path $configFile) -eq $false) {
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Say
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt
-    # if ($enableDebug) { Stop-Transcript }
     return $null
 }
 
@@ -169,7 +168,6 @@ if ($config.Output.Enable_Transcript_Logging) {
     LogStart $config.Output.Transcript_File_Path
 }
 
-# Start Script
 $hr = "=" * ($script_info.ProjectUri.OriginalString.Length)
 $hr | Say
 "$($script_info.Name) $($script_info.Version) ($(($script_info.ReleaseNotes | ConvertFrom-Json).ReleaseDate))" | Say

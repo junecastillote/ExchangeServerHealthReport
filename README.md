@@ -7,6 +7,8 @@ PowerShell script to extract and report Exchange server health statistics.
 - [Get-ExchangeServerHealth.ps1](#get-exchangeserverhealthps1)
 - [Configuration File Template](#configuration-file-template)
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
+  - [Branding](#branding)
+  - [TestItem](#testitem)
   - [ReportOptions](#reportoptions)
   - [Thresholds](#thresholds)
   - [Mail](#mail)
@@ -90,6 +92,24 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
 
 ## Configuration File Settings Explained
 
+### Branding
+
+- `Company_Name` : The name of the organization or company that you want to appear in the banner of the report
+
+### TestItem
+
+This section list the tests that can be toggled by changing values with `$true` or `$false`.
+
+- `CPU_and_RAM` : Get CPU and RAM usage
+- `Mailbox_Database` : Run mailbox database health checks
+- `Database_Copy` : Databas copy health check for DAG member servers
+- `Public_Folder_Database` : Run public folder database health checks
+- `Server_Health` : Run server health status checks
+- `DAG_Replication` : Run DAG database replication checks
+- `Server_Component` : Get server components status (Exchange 2013+)
+- `Mail_Queue` : Get mail queue count
+- `Disk_Space` : Get server disk space statistics
+
 ### ReportOptions
 
 This section can be toggled by changing values with `$true` or `$false`.
@@ -104,6 +124,7 @@ This section can be toggled by changing values with `$true` or `$false`.
 - `Database_Copy` - Checking the status of the Database Copies
 - `Send_Email_Report` - Option to send the HTML report via email
 - `Report_File_Path` - File path and name of the HTML Report
+- `Transcript_File_Path` - File path and name of the HTML Report
 
 ### Thresholds
 

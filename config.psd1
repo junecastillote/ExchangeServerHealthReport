@@ -15,8 +15,8 @@
     }
     Output    = @{
         Report_File_Path          = "C:\Scripts\ExchangeServiceHealth\report.html"
-        Transcript_File_Path      = "C:\Scripts\ExchangeServiceHealth\transcript.html"
-        Enable_Transcript_Logging = $false
+        Transcript_File_Path      = "C:\Scripts\ExchangeServiceHealth\transcript.log"
+        Enable_Transcript_Logging = $true
     }
     Threshold = @{
         Last_Full_Backup_Age_Day        = 0
