@@ -18,9 +18,10 @@
         Transcript_File_Path         = "C:\Scripts\ExchangeServiceHealth\transcript.log"
         Enable_Transcript_Logging    = $true
         Append_Timestamp_To_Filename = $true
+        Loud                         = $true
     }
     Threshold = @{
-        Last_Full_Backup_Age_Day        = 0
+        Last_Full_Backup_Age_Day        = 7
         Last_Incremental_Backup_Age_Day = 1
         Disk_Space_Free_Percent         = 12
         Mail_Queue_Count                = 20
@@ -30,7 +31,7 @@
         RAM_Usage_Percent               = 80
     }
     Mail      = @{
-        Send_Email_Report = $true
+        Send_Email_Report = $false
         Email_Subject     = "Exchange Service Health Report"
         SMTP_Server       = "mail.mg.poshlab.xyz"
         Sender_Address    = "Exchange Admin <exchange-Admin@mg.poshlab.xyz>"

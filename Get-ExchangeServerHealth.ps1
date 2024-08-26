@@ -47,6 +47,8 @@ param (
     [string]$ConfigFile
 )
 
+$now = [System.DateTime]::Now
+
 #Region Functions
 Function LogEnd {
     $txnLog = ""
@@ -76,7 +78,6 @@ Function BuildNumberToName {
     $definitions = Import-Csv "$script_root\ExchangeBuildNumbers.csv"
     $definitions | Where-Object { $_.'Build Number' -eq $BuildNumber }
 }
-
 
 Function TrimExchangeVersion {
     # This function formats the AdminDisplayVersion to Build Number
@@ -122,6 +123,17 @@ Function GetExchangeServerVerion {
     }
 }
 
+Function Loud {
+    param(
+        [Parameter(Mandatory)]
+        $Text
+    )
+
+    if ($Loud) {
+        Say $Text
+    }
+}
+
 Function Say {
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
@@ -161,21 +173,6 @@ if ((Test-Path $configFile) -eq $false) {
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt
     return $null
 }
-
-$config = Import-PowerShellDataFile $configFile
-
-if ($config.Output.Enable_Transcript_Logging) {
-    LogStart $config.Output.Transcript_File_Path
-}
-
-$hr = "=" * ($script_info.ProjectUri.OriginalString.Length)
-$hr | Say
-"$($script_info.Name) $($script_info.Version) ($(($script_info.ReleaseNotes | ConvertFrom-Json).ReleaseDate))" | Say
-"$($script_info.ProjectUri.OriginalString)" | Say
-$hr | Say
-# '' | Say
-'Begin' | Say
-'Setting Paths and Variables' | Say
 
 #Define Variables
 $availableTestCount = $config.TestItem.Count
@@ -293,6 +290,8 @@ $css_string = @'
 <body>
 '@
 
+$config = Import-PowerShellDataFile $configFile
+
 # Thresholds from config
 [int]$t_Last_Full_Backup_Age_Day = $config.Threshold.Last_Full_Backup_Age_Day
 [int]$t_Last_Incremental_Backup_Age_Day = $config.Threshold.Last_Incremental_Backup_Age_Day
@@ -304,40 +303,79 @@ $css_string = @'
 [double]$t_RAM_Usage_Percent = $config.Threshold.RAM_Usage_Percent
 
 # Options from config
-$CPU_and_RAM = $config.TestItem.CPU_and_RAM
-$Server_Health = $config.TestItem.Server_Health
-$Mailbox_Database = $config.TestItem.Mailbox_Database
-$Server_Component = $config.TestItem.Server_Component
-$Public_Folder_Database = $config.TestItem.Public_Folder_Database
-$Database_Copy = $config.TestItem.Database_Copy
-$DAG_Replication = $config.TestItem.DAG_Replication
-$Mail_Queue = $config.TestItem.Mail_Queue
-$Disk_Space = $config.TestItem.Disk_Space
-
-# Output
-$Report_File_Path = (New-Item -ItemType File -Path $config.Output.Report_File_Path -Force).FullName
-$Transcript_File_Path = $config.Output.Transcript_File_Path
+[bool]$CPU_and_RAM = $config.TestItem.CPU_and_RAM
+[bool]$Server_Health = $config.TestItem.Server_Health
+[bool]$Mailbox_Database = $config.TestItem.Mailbox_Database
+[bool]$Server_Component = $config.TestItem.Server_Component
+[bool]$Public_Folder_Database = $config.TestItem.Public_Folder_Database
+[bool]$Database_Copy = $config.TestItem.Database_Copy
+[bool]$DAG_Replication = $config.TestItem.DAG_Replication
+[bool]$Mail_Queue = $config.TestItem.Mail_Queue
+[bool]$Disk_Space = $config.TestItem.Disk_Space
 
 #Mail settings
-$Send_Email_Report = $config.Mail.Send_Email_Report
-$Company_Name = $config.Branding.Company_Name
-$Email_Subject = $config.Mail.Email_Subject
-$SMTP_Server = $config.Mail.SMTP_Server
-$Port = $config.Mail.Port
-$SSL_Enabled = $config.Mail.SSL_Enabled
-$Sender_Address = $config.Mail.Sender_Address
-$To_Address = @($config.Mail.To_Address)
-$Cc_Address = @($config.Mail.Cc_Address)
-$Bcc_Address = @($config.Mail.Bcc_Address)
-
+[bool]$Send_Email_Report = $config.Mail.Send_Email_Report
+[string]$Company_Name = $config.Branding.Company_Name
+[string]$Email_Subject = $config.Mail.Email_Subject
+[string]$SMTP_Server = $config.Mail.SMTP_Server
+[int]$Port = $config.Mail.Port
+[bool]$SSL_Enabled = $config.Mail.SSL_Enabled
+[string]$Sender_Address = $config.Mail.Sender_Address
+[string[]]$To_Address = @($config.Mail.To_Address)
+[string[]]$Cc_Address = @($config.Mail.Cc_Address)
+[string[]]$Bcc_Address = @($config.Mail.Bcc_Address)
 
 #Exclusions
-$Ignore_Server_Name = @($config.Exclusion.Ignore_Server_Name)
-$Ignore_MB_Database = @($config.Exclusion.Ignore_MB_Database)
-$Ignore_PF_Database = @($config.Exclusion.Ignore_PF_Database)
-$Ignore_Server_Component = @($config.Exclusion.Ignore_Server_Component)
+[string[]]$Ignore_Server_Name = @($config.Exclusion.Ignore_Server_Name)
+[string[]]$Ignore_MB_Database = @($config.Exclusion.Ignore_MB_Database)
+[string[]]$Ignore_PF_Database = @($config.Exclusion.Ignore_PF_Database)
+[string[]]$Ignore_Server_Component = @($config.Exclusion.Ignore_Server_Component)
+
+# Output
+[bool]$Loud = $config.Output.Loud
+[bool]$Append_Timestamp_To_Filename = $config.Output.Append_Timestamp_To_Filename
+
+if ($Append_Timestamp_To_Filename) {
+    $timeStamp = $now.ToString('yyyyMMddTHHmmss')
+
+    $reportFilename = [string]($config.Output.Report_File_Path).Replace('.html', "_$($timeStamp)_.html")
+    $Report_File_Path = (New-Item -ItemType File -Path $reportFilename).FullName
+
+    $transcriptFilename = [string]($config.Output.Transcript_File_Path).Replace('.log', "_$($timeStamp)_.log")
+    $Transcript_File_Path = $transcriptFilename
+}
+else {
+    $Report_File_Path = (New-Item -ItemType File -Path $config.Output.Report_File_Path -Force).FullName
+    $Transcript_File_Path = $config.Output.Transcript_File_Path
+}
+
+if ($config.Output.Enable_Transcript_Logging) {
+    LogStart $Transcript_File_Path
+}
+
+$hr = "=" * ($script_info.ProjectUri.OriginalString.Length)
+$hr | Say
+"$($script_info.Name) $($script_info.Version) ($(($script_info.ReleaseNotes | ConvertFrom-Json).ReleaseDate))" | Say
+"$($script_info.ProjectUri.OriginalString)" | Say
+$hr | Say
+
+if ($config.Output.Enable_Transcript_Logging) {
+    "Transcript @ $Transcript_File_Path" | Say
+}
+
+## Check if connected to Exchange Management Shell (Implicit Remoting)
+$orgConfig = Get-Command Get-OrganizationConfig -ErrorAction SilentlyContinue
+if (!$orgConfig -or $orgConfig.Source -eq 'Microsoft.Exchange.Management.PowerShell.E2010') {
+    "Not connected to Exchange Management Shell. Exiting script." | Say -Color Red
+    LogEnd
+    return $null
+}
+
+# 'Begin' | Say
+# 'Setting Paths and Variables' | Say
 
 Function Get-CPUAndMemoryLoad ($exchangeServers) {
+    "CPU and Memory Load check..." | Say
     $stats_collection = @()
     $TopProcessCPU = ""
     $tCounter = 0
@@ -345,7 +383,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         #Get CPU Usage
         $x = Get-Counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -computer $exchangeServer.Name | Select-Object -ExpandProperty countersamples | Select-Object -Property cookedvalue
 
-        "Getting CPU Load for $($exchangeServer.Name)" | Say
+        Loud "     --> Getting CPU Load for $($exchangeServer.Name)"
         $cpuMemObject = "" | Select-Object Server, CPU_Usage, Top_CPU_Consumers, Total_Memory_KB, Memory_Free_KB, Memory_Used_KB, Memory_Free_Percent, Memory_Used_Percent, Top_Memory_Consumers
         $cpuMemObject.Server = $exchangeServer.Name
         $cpuMemObject.CPU_Usage = "{0:N0}" -f ($x.cookedvalue)
@@ -366,8 +404,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         }
         $cpuMemObject.Top_CPU_Consumers = $TopProcessCPU
 
-        "Getting Memory Load for $($exchangeServer.Name)" | Say
-        # $memObj = Get-CimInstance -ComputerName $exchangeServer.Name -ClassName Win32_operatingsystem -Property CSName, TotalVisibleMemorySize, FreePhysicalMemory
+        Loud "     --> Getting Memory Load for $($exchangeServer.Name)"
         $memObj = Get-CimInstance -ComputerName $exchangeServer.Name -ClassName Win32_operatingsystem -Property CSName, TotalVisibleMemorySize, FreePhysicalMemory
         $cpuMemObject.Total_Memory_KB = $memObj.TotalVisibleMemorySize
         $cpuMemObject.Memory_Free_KB = $memObj.FreePhysicalMemory
@@ -571,8 +608,10 @@ Function Get-ServerHealth ($serverlist) {
     foreach ($server in $serverlist) {
         if (Ping-Server($server.name) -eq $true) {
             # $exchange_product = (AdminDisplayVersionToName -AdminDisplayVersion $server.AdminDisplayVersion)
+            Loud "     --> Getting Exchange Server version on $($server.name)"
             $exchange_version = GetExchangeServerVerion -ComputerName $server.name
 
+            Loud "     --> Getting Operating System information on $($server.name)"
             $serverOS = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $server
 
             $serverobj = "" | Select-Object Server, ProductName, BuildNumber, KB, Version, Edition, Connectivity, ADSite, UpTime, HubTransportRole, ClientAccessRole, MailboxRole, MailFlow, MessageLatency
@@ -595,7 +634,9 @@ Function Get-ServerHealth ($serverlist) {
             $site = ($server.site.ToString()).Split("/")
             $serverObj.ADSite = $site[-1]
             foreach ($service in $serviceStatus) {
+
                 if ($service.Role -eq 'Hub Transport Server Role') {
+                    Loud "     --> Testing 'Hub Transport Server Role' on $($server.name)"
                     if ($service.RequiredServicesRunning -eq $true) {
                         $serverobj.HubTransportRole = "Passed"
                     }
@@ -604,7 +645,9 @@ Function Get-ServerHealth ($serverlist) {
                     }
                 }
 
+
                 if ($service.Role -eq 'Client Access Server Role') {
+                    Loud "     --> Testing 'Client Access Server Role' on $($server.name)"
                     if ($service.RequiredServicesRunning -eq $true) {
                         $serverobj.ClientAccessRole = "Passed"
                     }
@@ -614,6 +657,7 @@ Function Get-ServerHealth ($serverlist) {
                 }
 
                 if ($service.Role -eq 'Mailbox Server Role') {
+                    Loud "     --> Testing 'Mailbox Server Role' on $($server.name)"
                     if ($service.RequiredServicesRunning -eq $true) {
                         $serverobj.MailboxRole = "Passed"
                     }
@@ -624,6 +668,7 @@ Function Get-ServerHealth ($serverlist) {
             }
             #Mail Flow
             if ($server.serverrole -match 'Mailbox' -AND $activeServers -contains $server.name) {
+                Loud "     --> Testing mail flow on $($server.name)"
                 $mailflowresult = $null
                 $result = Test-MailFlow -TargetMailboxServer $server.Name
                 $mailflowresult = $result.TestMailflowResult
@@ -1178,14 +1223,15 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
 
         if ($currentServer -ne $cpuAndMemData.Server) {
             $currentServer = $cpuAndMemData.Server
-            $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
+            $mbody += '<tr><th>Server Name</th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
+            # $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
         }
 
         if ([int]$cpuAndMemData.CPU_Usage -lt $t_CPU_Usage_Percent) {
-            $mbody += "<tr><td></td><td class = ""good"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
+            $mbody += "<tr>$($currentServer)<td></td><td class = ""good"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
         }
         elseif ([int]$cpuAndMemData.CPU_Usage -ge $t_CPU_Usage_Percent) {
-            $mbody += "<tr><td></td><td class = ""bad"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
+            $mbody += "<tr><td>$($currentServer)</td><td class = ""bad"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
             $errString += "<tr><td>CPU</td></td><td>$($currentServer) - $($cpuAndMemData.CPU_Usage)% CPU Load IS OVER the $($t_CPU_Usage_Percent)% threshold </td></tr>"
         }
 
@@ -1219,6 +1265,10 @@ foreach ($ExServer in $temp_ExServerList) {
         $exServerList += $ExServer
     }
 }
+
+Loud "     --> Exchange Servers: $($ExServerList -join ';')"
+Loud "     --> Ignored Servers: $($Ignore_Server_Name -join ';')"
+
 $nonEx2010 = $ExServerList | Where-Object { $_.AdminDisplayVersion -notlike "Version 14*" }
 $nonEx2010transportServers = @()
 $nonEx2010transportServers += $ExServerList | Where-Object { $_.AdminDisplayVersion -notlike "Version 14*" -and $_.ServerRole -match 'Mailbox' }
@@ -1240,6 +1290,8 @@ if ($Mailbox_Database -eq $true -OR $Database_Copy -eq $true) {
             $activeServers += ($ExMailboxDB.MountedOnServer).Split(".")[0]
         }
     }
+    Loud "     --> Mailbox Database: $($ExMailboxDBList -join ';')"
+    Loud "     --> Ignored Database: $($Ignore_MB_Database -join ';')"
     $activeServers = $activeServers | Select-Object -Unique
 }
 #----------------------------------------------------------------------------
@@ -1380,7 +1432,7 @@ $mail_body += '</html>'
 # $mbody = $mbox -replace "&lt;", "<"
 # $mbody = $mbox -replace "&gt;", ">"
 $mail_body | Out-File $Report_File_Path
-'HTML Report saved to file - ' + $Report_File_Path | Say
+'HTML Report @ ' + $Report_File_Path | Say
 #----------------------------------------------------------------------------
 # Mail Parameters------------------------------------------------------------
 $params = @{
