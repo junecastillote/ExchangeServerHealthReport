@@ -17,7 +17,7 @@
         Report_File_Path             = "C:\Scripts\ExchangeServiceHealth\report.html"
         Transcript_File_Path         = "C:\Scripts\ExchangeServiceHealth\transcript.log"
         Enable_Transcript_Logging    = $true
-        Append_Timestamp_To_Filename = $true
+        Append_Timestamp_To_Filename = $false
         Loud                         = $true
     }
     Threshold = @{
@@ -42,8 +42,8 @@
         Port              = 25
     }
     Exclusion = @{
-        Ignore_Server_Name      = @()
-        Ignore_MB_Database      = @()
+        Ignore_Server_Name      = @('')
+        Ignore_MB_Database      = @('DUMMY001')
         Ignore_PF_Database      = @()
         Ignore_Server_Component = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
