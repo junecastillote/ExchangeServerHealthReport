@@ -338,10 +338,10 @@ $config = Import-PowerShellDataFile $configFile
 if ($Append_Timestamp_To_Filename) {
     $timeStamp = $now.ToString('yyyyMMddTHHmmss')
 
-    $reportFilename = [string]($config.Output.Report_File_Path).Replace('.html', "_$($timeStamp)_.html")
+    $reportFilename = [string]($config.Output.Report_File_Path).Replace('.html', "_$($timeStamp).html")
     $Report_File_Path = (New-Item -ItemType File -Path $reportFilename).FullName
 
-    $transcriptFilename = [string]($config.Output.Transcript_File_Path).Replace('.log', "_$($timeStamp)_.log")
+    $transcriptFilename = [string]($config.Output.Transcript_File_Path).Replace('.log', "_$($timeStamp).log")
     $Transcript_File_Path = $transcriptFilename
 }
 else {
@@ -449,9 +449,11 @@ Function Get-MdbStatistic ($mailboxdblist) {
     'Mailbox Database Check... ' | Say
     $stats_collection = @()
     foreach ($mailboxdb in $mailboxdblist) {
+        Loud "     --> Ping test on $($mailboxdb.Server.Name)"
         if (Ping-Server($mailboxdb.Server.Name) -eq $true) {
             $mdbobj = "" | Select-Object Name, Mounted, MountedOnServer, ActivationPreference, DatabaseSize, AvailableNewMailboxSpace, ActiveMailboxCount, DisconnectedMailboxCount, TotalItemSize, TotalDeletedItemSize, EdbFilePath, LogFolderPath, LogFilePrefix, LastFullBackup, LastIncrementalBackup, BackupInProgress, MapiConnectivity, EDBFreeSpace, LogFreeSpace
             if ($mailboxdb.Mounted -eq $true) {
+                Loud "     --> Getting mailbox database statistics on $($mailboxdb.Server.Name)"
                 $mdbStat = Get-MailboxStatistics -Database $mailboxdb
                 $mbxItemSize = $mdbStat | ForEach-Object { $_.TotalItemSize.Value } | Measure-Object -Sum
                 $mbxDelSize = $mdbStat | ForEach-Object { $_.TotalDeletedItemSize.Value } | Measure-Object -Sum
@@ -561,6 +563,7 @@ Function Get-DiskSpaceStatistic ($serverlist) {
     $stats_collection = @()
     foreach ($server in $serverlist) {
         try {
+            Loud "     --> Getting fixed disk information on $($server)"
             $diskObj = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -computer $server | Select-Object SystemName, DeviceID, VolumeName, Size, FreeSpace
             foreach ($disk in $diskObj) {
                 $serverobj = "" | Select-Object SystemName, DeviceID, VolumeName, Size, FreeSpace, PercentFree
@@ -589,7 +592,22 @@ Function Get-DiskSpaceStatistic ($serverlist) {
 
 Function Get-ReplicationHealth {
     'Replication Health Check... ' | Say
-    $stats_collection = Get-MailboxServer | Where-Object { $_.DatabaseAvailabilityGroup } | Sort-Object Name | ForEach-Object { Test-ReplicationHealth -Identity $_ }
+    $stats_collection = @(Get-MailboxServer | Where-Object { $_.DatabaseAvailabilityGroup -and $_.Name -notin $Ignore_Server_Name } | Sort-Object Name | ForEach-Object {
+            Loud "     --> Testing replication health on $($_.Name)"
+            Test-ReplicationHealth -Identity $_
+        })
+
+    # $stats_collection = @()
+    # if ($Ignore_MB_Database) {
+    #     foreach ($db in $Ignore_MB_Database) {
+    #         foreach ($item in $stats_collection) {
+    #             if ($item.Error -notlike "*$($db)*") {
+    #                 $item.Result.Value = 'Passed'
+    #                 $item.Error = ''
+    #             }
+    #         }
+    #     }
+    # }
 
     return $stats_collection
 }
@@ -597,7 +615,10 @@ Function Get-ReplicationHealth {
 Function Get-MailQueueCount ($transportServerList) {
     'Mail Queue Check... ' | Say
     #$stats_collection = get-TransportServer | Where-Object {$_.ServerRole -notmatch 'Edge'} | Sort-Object Name | ForEach-Object {Get-Queue -Server $_}
-    $stats_collection = $transportServerList | Sort-Object Name | ForEach-Object { Get-Queue -Server $_ | Where-Object { $_.Identity -notmatch 'Shadow' } }
+    $stats_collection = $transportServerList | Where-Object { $_.Name -notin $Ignore_Server_Name } | Sort-Object Name | ForEach-Object {
+        Loud "     --> Checking mail queue on $($_.Name)"
+        Get-Queue -Server $_ | Where-Object { $_.Identity -notmatch 'Shadow' }
+    }
 
     return $stats_collection
 }
@@ -779,9 +800,8 @@ Function Get-DatabaseCopyStatus ($mailboxdblist) {
         if ($db.DatabaseCopies.Count -lt 2) {
             continue
         }
-        #if ($db.MasterType -eq 'DatabaseAvailabilityGroup')
-        #{
-        foreach ($dbCopy in $db.DatabaseCopies) {
+        foreach ($dbCopy in ($db.DatabaseCopies | Where-Object { $_.HostServerName -notin $Ignore_Server_Name })) {
+            Loud "     --> Getting database copy status of $($dbCopy.Identity.ToString())"
             $temp = "" | Select-Object Name, Status, CopyQueueLength, LogCopyQueueIncreasing, ReplayQueueLength, LogReplayQueueIncreasing, ContentIndexState, ContentIndexErrorMessage
             $dbStatus = Get-MailboxDatabaseCopyStatus -Identity $dbCopy
             $temp.Name = $dbStatus.Name
@@ -800,7 +820,7 @@ Function Get-DatabaseCopyStatus ($mailboxdblist) {
             }
             $stats_collection += $temp
         }
-        #}
+
     }
 
     return $stats_collection | Sort-Object Name
@@ -887,8 +907,10 @@ Function Get-ExServerComponent ($exServerList) {
     'Server Component State... ' | Say
     foreach ($exServer in $exServerList) {
         #$stats_collection += (Get-ServerComponentState $exServer | Where-Object {$_.State -ne 'Active'} | Select-Object Identity,Component,State)
+        Loud "     --> Getting server component state on $($exServer)"
         $stats_collection += (Get-ServerComponentState $exServer | Where-Object { $_.Component -notin $Ignore_Server_Component } | Select-Object Identity, Component, State)
     }
+    Loud "     --> Ignored server component: $($Ignore_Server_Component -join ';')"
 
     return $stats_collection
 }
@@ -941,17 +963,38 @@ Function Get-ReplicationReport ($replInfo) {
             $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>Result</th><th>Error</th></tr>'
         }
 
-        if ($repl.Result -match "Pass") {
-            $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result)</td><td>$($repl.Error)</td></tr>"
+        if ($Ignore_MB_Database) {
+            # This code section checks the replication health result of the ignored database and changes its result to Passed
+            foreach ($db in $Ignore_MB_Database) {
+                if ($repl.Error -like "*$($db)*") {
+                    $resultValue = 'Passed'
+                    $resultError = ''
+                }
+                else {
+                    $resultValue = $repl.Result
+                    $resultError = $repl.Error
+                }
+
+                if ($resultValue -like "Pass*") {
+                    $mbody += "<tr><td>$($repl.Check)</td><td>$($resultValue)</td><td>$($resultError)</td></tr>"
+                }
+                else {
+                    $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($resultValue) - $($resultError)</td></tr>"
+                    $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($resultValue)</td><td>$($resultError)</td></tr>"
+                }
+            }
         }
         else {
-            $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result) - $($repl.Error)</td></tr>"
-            $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result)</td><td>$($repl.Error)</td></tr>"
+            if ($repl.Result -match "Pass") {
+                $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result)</td><td>$($repl.Error)</td></tr>"
+            }
+            else {
+                $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result) - $($repl.Error)</td></tr>"
+                $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result)</td><td>$($repl.Error)</td></tr>"
+            }
         }
     }
     $mbody += ""
-
-
 
     if ($errString) { $mResult = "<tr><td>DAG Members Replication</td><td class = ""bad"">Failed</td></tr>" ; $testFailed = 1 }
 
@@ -1228,13 +1271,12 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
         }
 
         if ([int]$cpuAndMemData.CPU_Usage -lt $t_CPU_Usage_Percent) {
-            $mbody += "<tr>$($currentServer)<td></td><td class = ""good"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
+            $mbody += "<tr><td>$($currentServer)</td><td class = ""good"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
         }
         elseif ([int]$cpuAndMemData.CPU_Usage -ge $t_CPU_Usage_Percent) {
             $mbody += "<tr><td>$($currentServer)</td><td class = ""bad"">$($cpuAndMemData.CPU_Usage)%</td><td>$($Top_CPU_Consumers)</td>"
             $errString += "<tr><td>CPU</td></td><td>$($currentServer) - $($cpuAndMemData.CPU_Usage)% CPU Load IS OVER the $($t_CPU_Usage_Percent)% threshold </td></tr>"
         }
-
 
         if ([int]$cpuAndMemData.Memory_Used_Percent -lt $t_RAM_Usage_Percent) {
             $mbody += "<td class = ""good"">$($cpuAndMemData.Memory_Used_Percent)%</td><td>$($Top_Memory_Consumers)</td></tr>"
@@ -1280,7 +1322,7 @@ $transportServers += $nonEx2010transportServers + $Ex2010TransportServers
 #Get-List of Mailbox Database and assign to array----------------------------
 if ($Mailbox_Database -eq $true -OR $Database_Copy -eq $true) {
     'Building List of Mailbox Database' | Say
-    $temp_ExMailboxDBList = Get-MailboxDatabase -Status | Where-Object { $_.Recovery -eq $False }
+    $temp_ExMailboxDBList = Get-MailboxDatabase -Status | Where-Object { $_.Recovery -eq $False -and $_.Server -notin $Ignore_Server_Name }
     #Get rid of excluded Mailbox Database
     $ExMailboxDBList = @()
     $activeServers = @()
