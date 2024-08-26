@@ -14,9 +14,10 @@
         Database_Copy          = $true
     }
     Output    = @{
-        Report_File_Path          = "C:\Scripts\ExchangeServiceHealth\report.html"
-        Transcript_File_Path      = "C:\Scripts\ExchangeServiceHealth\transcript.log"
-        Enable_Transcript_Logging = $true
+        Report_File_Path             = "C:\Scripts\ExchangeServiceHealth\report.html"
+        Transcript_File_Path         = "C:\Scripts\ExchangeServiceHealth\transcript.log"
+        Enable_Transcript_Logging    = $true
+        Append_Timestamp_To_Filename = $true
     }
     Threshold = @{
         Last_Full_Backup_Age_Day        = 0
