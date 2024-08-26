@@ -67,10 +67,11 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
         Report_File_Path             = "C:\Scripts\ExchangeServiceHealth\report.html"
         Transcript_File_Path         = "C:\Scripts\ExchangeServiceHealth\transcript.log"
         Enable_Transcript_Logging    = $true
-        Append_Timestamp_To_Filename = $true
+        Append_Timestamp_To_Filename = $false
+        Loud                         = $true
     }
     Threshold = @{
-        Last_Full_Backup_Age_Day        = 0
+        Last_Full_Backup_Age_Day        = 7
         Last_Incremental_Backup_Age_Day = 1
         Disk_Space_Free_Percent         = 12
         Mail_Queue_Count                = 20
@@ -82,17 +83,17 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
     Mail      = @{
         Send_Email_Report = $true
         Email_Subject     = "Exchange Service Health Report"
-        SMTP_Server       = "mail.mg.poshlab.xyz"
-        Sender_Address    = "Exchange Admin <exchange-Admin@mg.poshlab.xyz>"
-        To_Address        = @('june.castillote@gmail.com')
+        SMTP_Server       = "mail.server.address.here"
+        Sender_Address    = "Exchange Admin <exchange-Admin@domain.tld>"
+        To_Address        = @('admin1@domain.tld')
         Cc_Address        = @()
         Bcc_Address       = @()
         SSL_Enabled       = $false
         Port              = 25
     }
     Exclusion = @{
-        Ignore_Server_Name      = @()
-        Ignore_MB_Database      = @()
+        Ignore_Server_Name      = @('')
+        Ignore_MB_Database      = @('DUMMY001')
         Ignore_PF_Database      = @()
         Ignore_Server_Component = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
@@ -126,6 +127,7 @@ This section list the tests that can be toggled by changing values with `$true` 
 - `Enable_Transcript_Logging` : Specify whether to enable transcript logging.
 - `Append_Timestamp_To_Filename` : When enabled, the output filename of the report and transcript will have the timestamp appended.
   - eg. `report_20240804T001023.html` - August 4, 2024, 12:10:23 AM (local time)
+- `Loud` - Enable or disable detailed console output. Default value is `$true`.
 
 ### Threshold
 
