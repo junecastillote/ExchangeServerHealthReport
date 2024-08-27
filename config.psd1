@@ -7,7 +7,7 @@
         Server_Health          = $true
         Mailbox_Database       = $true
         Server_Component       = $true
-        Public_Folder_Database = $false
+        Public_Folder_Database = $true
         DAG_Replication        = $true
         Mail_Queue             = $true
         Disk_Space             = $true
