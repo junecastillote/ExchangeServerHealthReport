@@ -97,30 +97,41 @@ Function AdminDisplayVersionToName {
 
 Function GetExchangeServerVerion {
     param(
-        [string]$ComputerName = '.'
+        [string]$ComputerName
     )
-    Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-        $(
-            $product_table = @{
-                '14.0' = 'Exchange Server 2010'
-                '14.1' = 'Exchange Server 2010 SP1'
-                '14.2' = 'Exchange Server 2010 SP2'
-                '14.3' = 'Exchange Server 2010 SP3'
-                '15.0' = 'Exchange Server 2013'
-                '15.1' = 'Exchange Server 2016'
-                '15.2' = 'Exchange Server 2019'
-            }
 
-            try {
-                $exSetup = Get-Command Exsetup.exe -ErrorAction Stop
-                $exSetup | Add-Member -MemberType NoteProperty -Name ProductName -Value $($product_table["$($exSetup.Version.Major).$($exSetup.Version.Minor)"])
-                $exSetup
-            }
-            catch {
-                $null
-            }
-        )
+    $paramCollection = @{ }
+
+    if ($ComputerName) {
+        $paramCollection.Add('ComputerName', $ComputerName)
     }
+    $paramCollection.Add(
+        'ScriptBlock', {
+            $(
+                $product_table = @{
+                    '14.0' = 'Exchange Server 2010'
+                    '14.1' = 'Exchange Server 2010 SP1'
+                    '14.2' = 'Exchange Server 2010 SP2'
+                    '14.3' = 'Exchange Server 2010 SP3'
+                    '15.0' = 'Exchange Server 2013'
+                    '15.1' = 'Exchange Server 2016'
+                    '15.2' = 'Exchange Server 2019'
+                }
+
+                try {
+                    $exSetup = Get-Command Exsetup.exe -ErrorAction Stop
+                    $exSetup | Add-Member -MemberType NoteProperty -Name ProductName -Value $($product_table["$($exSetup.Version.Major).$($exSetup.Version.Minor)"])
+                    $exSetup
+                }
+                catch {
+                    $null
+                }
+            )
+        }
+
+    )
+
+    Invoke-Command @paramCollection
 }
 
 Function Loud {
@@ -632,7 +643,14 @@ Function Get-ServerHealth ($serverlist) {
         if (Ping-Server($server.name) -eq $true) {
             # $exchange_product = (AdminDisplayVersionToName -AdminDisplayVersion $server.AdminDisplayVersion)
             Loud "     --> Getting Exchange Server version on $($server.name)"
-            $exchange_version = GetExchangeServerVerion -ComputerName $server.name
+
+            if ($server.name -ne $($env:computername)) {
+                $exchange_version = GetExchangeServerVerion -ComputerName $server.name
+            }
+            else {
+                $exchange_version = GetExchangeServerVerion
+            }
+
 
             Loud "     --> Getting Operating System information on $($server.name)"
             $serverOS = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $server
