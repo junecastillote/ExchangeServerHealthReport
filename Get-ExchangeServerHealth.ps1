@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0
+.VERSION 0.1
 
 .GUID 963ce0ae-f75b-4da0-b917-f96b5b0cf4cb
 
@@ -174,6 +174,8 @@ if ((Test-Path $configFile) -eq $false) {
     return $null
 }
 
+$config = Import-PowerShellDataFile $configFile
+
 #Define Variables
 $availableTestCount = $config.TestItem.Count
 $enabledTestCount = ($config.TestItem.GetEnumerator() | Where-Object { $_.Value }).Count
@@ -290,7 +292,7 @@ $css_string = @'
 <body>
 '@
 
-$config = Import-PowerShellDataFile $configFile
+
 
 # Thresholds from config
 [int]$t_Last_Full_Backup_Age_Day = $config.Threshold.Last_Full_Backup_Age_Day
@@ -730,7 +732,6 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
         $mbody += "<tr><td>$($server.server)</td><td>Name: $($server.ProductName)<br/>Build: $($server.BuildNumber)<br/>Edition: $($server.Edition)</td><td>$($server.ADSite)</td>"
         #Uptime
         if ($server.UpTime -lt 24) {
-            #$errString += "<tr><td>Server Up Time</td></td><td>$($server.server) - up time [$($server.Uptime)] is less than 24 hours</td></tr>"
             $mbody += "<td class = ""good"">$($server.Connectivity)</td><td class = ""bad"">$($server.UpTime)</td>"
         }
         elseif ($server.Uptime -eq 'Cannot retrieve up time') {
@@ -963,35 +964,24 @@ Function Get-ReplicationReport ($replInfo) {
             $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>Result</th><th>Error</th></tr>'
         }
 
-        if ($Ignore_MB_Database) {
-            # This code section checks the replication health result of the ignored database and changes its result to Passed
-            foreach ($db in $Ignore_MB_Database) {
-                if ($repl.Error -like "*$($db)*") {
-                    $resultValue = 'Passed'
-                    $resultError = ''
-                }
-                else {
-                    $resultValue = $repl.Result
-                    $resultError = $repl.Error
-                }
+        ## Check if the database with error is in the ignore database list
+        if ($match_db = $Ignore_MB_Database | Where-Object { $repl.Error -match $_ }) {
+            ## If DB is ignored, set result to Passed and skip to the next item.
+            $mbody += "<tr><td>$($repl.Check)</td><td>Passed</td><td>Ignored database: $($match_db)</td></tr>"
+            continue
+        }
 
-                if ($resultValue -like "Pass*") {
-                    $mbody += "<tr><td>$($repl.Check)</td><td>$($resultValue)</td><td>$($resultError)</td></tr>"
-                }
-                else {
-                    $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($resultValue) - $($resultError)</td></tr>"
-                    $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($resultValue)</td><td>$($resultError)</td></tr>"
-                }
-            }
+        if ($repl.Result.ToString() -eq 'Passed') {
+            $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result.ToString())</td><td></td></tr>"
         }
         else {
-            if ($repl.Result -match "Pass") {
-                $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result)</td><td>$($repl.Error)</td></tr>"
-            }
-            else {
-                $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result) - $($repl.Error)</td></tr>"
-                $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result)</td><td>$($repl.Error)</td></tr>"
-            }
+            ## remove empty lines in the error and convert to HTML break lines
+            $replError = ($repl.Error -split "`n" | Select-String -Pattern '\S').Line -join '<br />'
+            # $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result.ToString()) - $($repl.Error -replace "`n",'<br />')</td></tr>"
+            # $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result.ToString()) - $($replError)</td></tr>"
+            $errString += "<tr><td>Replication</td></td><td>$($repl.Check) is $($repl.Result.ToString()) - $($replError)</td></tr>"
+            # $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$($repl.Error)</td></tr>"
+            $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$($replError)</td></tr>"
         }
     }
     $mbody += ""
