@@ -5,7 +5,8 @@ PowerShell script to extract and report Exchange server health statistics.
 > NOTE: This script is based on the previous script called [Get-ExchangeHealth.ps1](https://github.com/junecastillote/Get-ExchangeHealth). I decided to create a new repository for a new script because of many breaking changes made on this one, especially to the configuration file contents and parameters.
 
 - [What the script does?](#what-the-script-does)
-- [Sample Output](#sample-output)
+- [System Requirements](#system-requirements)
+- [Permission Requirements](#permission-requirements)
 - [Get-ExchangeServerHealth.ps1](#get-exchangeserverhealthps1)
 - [Configuration File Template](#configuration-file-template)
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
@@ -35,7 +36,22 @@ The script performs several checks on your Exchange Servers like the ones below:
 
 Then an HTML report will be generated and can be sent via email if enabled in the configuration file.
 
-## Sample Output
+## System Requirements
+
+- This script is compatible with Exchange Server versions:
+  - 2010 (will be removed in future script releases)
+  - 2013
+  - 2016
+  - 2019
+- This script must be run on an Exchange Server with at least one mailbox database active.
+- Windows PowerShell 5.1
+
+## Permission Requirements
+
+The account that runs this script must have the following:
+
+- Minimum: Exchange role group membership `View-Only Organization Management`.
+- Minimum: Local `administrator` rights on Exchange Server computers.
 
 ## Get-ExchangeServerHealth.ps1
 
@@ -180,6 +196,44 @@ This example runs the script using the `config.psd1` configuration file on the s
  ![Example 1](resource/images/Example_01.png)
 
 ### Example 2: Running as a Scheduled Task
+
+1. First, create a run file. Below is an example called `run.ps1`.
+
+    > **Note**: Replace the full path of the script (`C:\Scripts\ExchangeServerhealth\Get-ExchangeServerHealth.ps1`) and configuration (`C:\Scripts\ExchangeServerhealth\config.psd1`) files as needed.
+
+    ```PowerShell
+    # run.ps1
+
+    # Start Exchange PowerShell implicit remoting session
+    . "$($env:ExchangeInstallPath)\Bin\RemoteExchange.ps1"; Connect-ExchangeServer -auto
+
+    # Run the server health report
+    $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    & C:\Scripts\ExchangeServerhealth\Get-ExchangeServerHealth.ps1 -ConfigFile C:\Scripts\ExchangeServerhealth\config.psd1
+
+    ```
+
+2. Open the Task Scheduler and create a new task.
+3. Specify the name of the new task.
+4. Select "Run whether user is logged on or not".
+
+    ![General tab](resource/images/ts_general.png)
+
+5. Go to the **Actions** tab.
+6. Add a new action with the following details.
+   - Action: Start a program
+   - Program/script: `powershell.exe`
+   - Add arguments: `-file "Path to run file"` (eg. `-file "C:\Scripts\ExchangeServerhealt\run.ps1"`)
+
+    ![New action](resource/images/ts_action.png)
+
+7. Go to the **Triggers** tab and add your preferred trigger/interval. The below example is a daily trigger at 5AM.
+
+   ![new trigger](resource/images/ts_trigger.png)
+
+8. Save the new task and test it.
+9. Review the transcript (if transcript loggin is enabled in the configuration file).
+    ![Transcript](resource/images/transcript.png)
 
 ## Sample HTML Report
 
