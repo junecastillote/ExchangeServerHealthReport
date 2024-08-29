@@ -17,6 +17,8 @@ PowerShell script to extract and report Exchange server health statistics.
   - [Exclusion](#exclusion)
 - [Usage Examples](#usage-examples)
   - [Example 1: Running Manually in Exchange Management Shell](#example-1-running-manually-in-exchange-management-shell)
+  - [Example 2: Running as a Scheduled Task](#example-2-running-as-a-scheduled-task)
+- [Sample HTML Report](#sample-html-report)
 
 ## What the script does?
 
@@ -176,3 +178,9 @@ This section is where the exclusions can be defined.
 
 This example runs the script using the `config.psd1` configuration file on the same directory.
  ![Example 1](resource/images/Example_01.png)
+
+### Example 2: Running as a Scheduled Task
+
+## Sample HTML Report
+
+<a href="resource/docs/report.html" target="_blank">Click to see sample HTML report</a>
