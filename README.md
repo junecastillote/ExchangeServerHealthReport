@@ -236,4 +236,4 @@ This example runs the script using the `config.psd1` configuration file on the s
 
 ## Sample HTML Report
 
-<a href="resource/docs/report.html" target="_blank">Click to see sample HTML report</a>
+![Sample HTML report](resource/images/sample_html_report.png)
