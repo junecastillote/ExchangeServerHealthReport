@@ -208,7 +208,6 @@ This example runs the script using the `config.psd1` configuration file on the s
     . "$($env:ExchangeInstallPath)\Bin\RemoteExchange.ps1"; Connect-ExchangeServer -auto
 
     # Run the server health report
-    $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
     & C:\Scripts\ExchangeServerhealth\Get-ExchangeServerHealth.ps1 -ConfigFile C:\Scripts\ExchangeServerhealth\config.psd1
 
     ```
