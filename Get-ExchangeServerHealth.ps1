@@ -71,29 +71,29 @@ Function LogStart {
     Start-Transcript $logPath -Force | Out-Null
 }
 
-Function BuildNumberToName {
-    param (
-        [string]$BuildNumber
-    )
-    $definitions = Import-Csv "$script_root\ExchangeBuildNumbers.csv"
-    $definitions | Where-Object { $_.'Build Number' -eq $BuildNumber }
-}
+# Function BuildNumberToName {
+#     param (
+#         [string]$BuildNumber
+#     )
+#     $definitions = Import-Csv "$script_root\ExchangeBuildNumbers.csv"
+#     $definitions | Where-Object { $_.'Build Number' -eq $BuildNumber }
+# }
 
-Function TrimExchangeVersion {
-    # This function formats the AdminDisplayVersion to Build Number
-    # ie. "Version 15.2 (Build 1258.12)" to "15.2.1258.12"
-    param (
-        [string]$AdminDisplayVersion
-    )
-    $AdminDisplayVersion.ToString().Replace('Version ', '').Replace(' (Build ', '.').replace(')', '')
-}
+# Function TrimExchangeVersion {
+#     # This function formats the AdminDisplayVersion to Build Number
+#     # ie. "Version 15.2 (Build 1258.12)" to "15.2.1258.12"
+#     param (
+#         [string]$AdminDisplayVersion
+#     )
+#     $AdminDisplayVersion.ToString().Replace('Version ', '').Replace(' (Build ', '.').replace(')', '')
+# }
 
-Function AdminDisplayVersionToName {
-    param(
-        [string]$AdminDisplayVersion
-    )
-    BuildNumberToName (TrimExchangeVersion $AdminDisplayVersion)
-}
+# Function AdminDisplayVersionToName {
+#     param(
+#         [string]$AdminDisplayVersion
+#     )
+#     BuildNumberToName (TrimExchangeVersion $AdminDisplayVersion)
+# }
 
 Function GetExchangeServerVerion {
     param(
@@ -176,7 +176,7 @@ Function Say {
 # Start Script
 
 $script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
-$script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+# $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 #Import Configuration File
 if ((Test-Path $configFile) -eq $false) {
@@ -326,7 +326,7 @@ $css_string = @'
 [bool]$Mail_Queue = $config.TestItem.Mail_Queue
 [bool]$Disk_Space = $config.TestItem.Disk_Space
 
-#Mail settings
+# Mail settings
 [bool]$Send_Email_Report = $config.Mail.Send_Email_Report
 [string]$Company_Name = $config.Branding.Company_Name
 [string]$Email_Subject = $config.Mail.Email_Subject
@@ -338,7 +338,7 @@ $css_string = @'
 [string[]]$Cc_Address = @($config.Mail.Cc_Address)
 [string[]]$Bcc_Address = @($config.Mail.Bcc_Address)
 
-#Exclusions
+# Exclusions
 [string[]]$Ignore_Server_Name = @($config.Exclusion.Ignore_Server_Name)
 [string[]]$Ignore_MB_Database = @($config.Exclusion.Ignore_MB_Database)
 [string[]]$Ignore_PF_Database = @($config.Exclusion.Ignore_PF_Database)
@@ -376,7 +376,7 @@ if ($config.Output.Enable_Transcript_Logging) {
     "Transcript @ $Transcript_File_Path" | Say
 }
 
-## Check if connected to Exchange Management Shell (Implicit Remoting)
+# Check if connected to Exchange Management Shell (Implicit Remoting)
 $orgConfig = Get-Command Get-OrganizationConfig -ErrorAction SilentlyContinue
 if (!$orgConfig -or $orgConfig.Source -eq 'Microsoft.Exchange.Management.PowerShell.E2010') {
     "Not connected to Exchange Management Shell. Exiting script." | Say -Color Red
@@ -384,16 +384,13 @@ if (!$orgConfig -or $orgConfig.Source -eq 'Microsoft.Exchange.Management.PowerSh
     return $null
 }
 
-# 'Begin' | Say
-# 'Setting Paths and Variables' | Say
-
 Function Get-CPUAndMemoryLoad ($exchangeServers) {
     "CPU and Memory Load check..." | Say
     $stats_collection = @()
     $TopProcessCPU = ""
     $tCounter = 0
     foreach ($exchangeServer in $exchangeServers) {
-        #Get CPU Usage
+        # Get CPU Usage
         $x = Get-Counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -computer $exchangeServer.Name | Select-Object -ExpandProperty countersamples | Select-Object -Property cookedvalue
 
         Loud "     --> Getting CPU Load for $($exchangeServer.Name)"
@@ -401,7 +398,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         $cpuMemObject.Server = $exchangeServer.Name
         $cpuMemObject.CPU_Usage = "{0:N0}" -f ($x.cookedvalue)
 
-        #Get Top 3
+        # Get Top 3
         $TopProcessCPU = ""
         $y = Get-Counter '\Process(*)\% Processor Time' -computer $exchangeServer.Name | Select-Object -ExpandProperty countersamples | Where-Object { $_.instancename -ne 'idle' -and $_.instancename -ne '_total' } | Select-Object -Property instancename, cookedvalue | Sort-Object -Property cookedvalue -Descending | Select-Object -First 5
         foreach ($tproc in $y) {
@@ -425,7 +422,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
         $cpuMemObject.Memory_Used_Percent = "{0:N0}" -f (($cpuMemObject.Memory_Used_KB / $cpuMemObject.Total_Memory_KB) * 100)
         $cpuMemObject.Memory_Free_Percent = "{0:N0}" -f (($cpuMemObject.Memory_Free_KB / $cpuMemObject.Total_Memory_KB) * 100)
 
-        #Get the Top Memory Consumers
+        # Get the Top Memory Consumers
         $processes = Get-Process -ComputerName $exchangeServer.Name | Group-Object -Property ProcessName
         $proc_collection = @()
         foreach ($process in $processes) {
@@ -452,7 +449,7 @@ Function Get-CPUAndMemoryLoad ($exchangeServers) {
     Return $stats_collection
 }
 
-#Ping function
+# Ping function
 Function Ping-Server ($server) {
     $ping = Test-Connection $server -Quiet -Count 1
     return $ping
@@ -482,7 +479,7 @@ Function Get-MdbStatistic ($mailboxdblist) {
                 $mdbobj.DatabaseSize = "{0:N2}" -f ($mailboxdb.DatabaseSize.tobytes() / 1GB)
                 $mdbobj.AvailableNewMailboxSpace = "{0:N2}" -f ($mailboxdb.AvailableNewMailboxSpace.tobytes() / 1GB)
                 $mdbobj.MapiConnectivity = Test-MapiConnectivity -Database $mailboxdb.Identity -PerConnectionTimeout 10
-                #Get Disk Details
+                # Get Disk Details
                 $dbDrive = (Get-CimInstance Win32_LogicalDisk -Computer $mailboxdb.Server.Name | Where-Object { $_.DeviceID -eq $mailboxdb.EdbFilePath.DriveName })
                 $logDrive = (Get-CimInstance Win32_LogicalDisk -Computer $mailboxdb.Server.Name | Where-Object { $_.DeviceID -eq $mailboxdb.LogFolderPath.DriveName })
                 $mdbobj.EDBFreeSpace = "{0:N2}" -f ($dbDrive.Size / 1GB) + ' [' + "{0:N2}" -f ($dbDrive.FreeSpace / 1GB) + ']'
@@ -501,7 +498,7 @@ Function Get-MdbStatistic ($mailboxdblist) {
                 $mdbobj.DatabaseSize = "DISMOUNTED"
                 $mdbobj.AvailableNewMailboxSpace = "DISMOUNTED"
                 $mdbobj.MapiConnectivity = "Failed"
-                #Get Disk Details
+                # Get Disk Details
                 $dbDrive = "DISMOUNTED"
                 $logDrive = "DISMOUNTED"
                 $mdbobj.EDBFreeSpace = "DISMOUNTED"
@@ -610,24 +607,11 @@ Function Get-ReplicationHealth {
             Test-ReplicationHealth -Identity $_
         })
 
-    # $stats_collection = @()
-    # if ($Ignore_MB_Database) {
-    #     foreach ($db in $Ignore_MB_Database) {
-    #         foreach ($item in $stats_collection) {
-    #             if ($item.Error -notlike "*$($db)*") {
-    #                 $item.Result.Value = 'Passed'
-    #                 $item.Error = ''
-    #             }
-    #         }
-    #     }
-    # }
-
     return $stats_collection
 }
 
 Function Get-MailQueueCount ($transportServerList) {
     'Mail Queue Check... ' | Say
-    #$stats_collection = get-TransportServer | Where-Object {$_.ServerRole -notmatch 'Edge'} | Sort-Object Name | ForEach-Object {Get-Queue -Server $_}
     $stats_collection = $transportServerList | Where-Object { $_.Name -notin $Ignore_Server_Name } | Sort-Object Name | ForEach-Object {
         Loud "     --> Checking mail queue on $($_.Name)"
         Get-Queue -Server $_ | Where-Object { $_.Identity -notmatch 'Shadow' }
@@ -651,7 +635,6 @@ Function Get-ServerHealth ($serverlist) {
                 $exchange_version = GetExchangeServerVerion
             }
 
-
             Loud "     --> Getting Operating System information on $($server.name)"
             $serverOS = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $server
 
@@ -660,11 +643,8 @@ Function Get-ServerHealth ($serverlist) {
             [int]$uptime = "{0:00}" -f $timespan.TotalHours
 
             $serverobj.Server = $server.Name
-            # $serverobj.ProductName = $exchange_product.'Product Name'
             $serverobj.ProductName = $exchange_version.ProductName
-            # $serverobj.BuildNumber = $exchange_product.'Build Number'
             $serverobj.BuildNumber = $exchange_version.version.ToString()
-            # $serverobj.KB = $exchange_product.KB
             $serverobj.Edition = $server.Edition
             $serverobj.UpTime = $uptime
             $serverobj.Connectivity = "Passed"
@@ -741,14 +721,12 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
     $testFailed = 0
     $mbody = @()
     $errString = @()
-    #$currentServer = ""
     $mbody += '<table id="SectionLabels"><tr><th class="data">Server Health Status</th></tr></table>'
     $mbody += '<table id="data">'
-    # $mbody += '<tr><th>Server</th><th>Version / Edition</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
     $mbody += '<tr><th>Server Name</th><th>Product</th><th>Site</th><th>Connectivity</th><th>Up Time (Hours)</th><th>Hub Transport Role</th><th>Client Access Role</th><th>Mailbox Role</th><th>Mail Flow</th></tr>'
     foreach ($server in $serverhealthinfo) {
         $mbody += "<tr><td>$($server.server)</td><td>Name: $($server.ProductName)<br/>Build: $($server.BuildNumber)<br/>Edition: $($server.Edition)</td><td>$($server.ADSite)</td>"
-        #Uptime
+        # Uptime
         if ($server.UpTime -lt 24) {
             $mbody += "<td class = ""good"">$($server.Connectivity)</td><td class = ""bad"">$($server.UpTime)</td>"
         }
@@ -759,7 +737,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
         else {
             $mbody += "<td class = ""good"">$($server.Connectivity)</td><td class = ""good"">$($server.UpTime)</td>"
         }
-        #Transport Role
+        # Transport Role
         if ($server.HubTransportRole -eq 'Passed') {
             $mbody += '<td class = "good">Passed</td>'
         }
@@ -770,7 +748,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
         else {
             $mbody += '<td class = "good"></td>'
         }
-        #CAS Role
+        # CAS Role
         if ($server.ClientAccessRole -eq 'Passed') {
             $mbody += '<td class = "good">Passed</td>'
         }
@@ -781,7 +759,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
         else {
             $mbody += '<td class = "good"></td>'
         }
-        #Mailbox Role
+        # Mailbox Role
         if ($server.MailboxRole -eq 'Passed') {
             $mbody += '<td class = "good">Passed</td>'
         }
@@ -793,7 +771,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
             $mbody += '<td class = "good"></td>'
         }
 
-        #Mail Flow
+        # Mail Flow
         if ($server.MailFlow -eq "Failed") {
             $errString += "<tr><td>Mail Flow</td></td><td>$($db.Name) - Mail Flow Result FAILED</td></tr>"
             $mbody += '<td class = "bad">Failed</td>'
@@ -859,7 +837,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
 
         $mbody += "<tr><td>$($mdbCopy.Name)</td>"
 
-        #Status
+        # Status
         if ($mdbCopy.Status -eq 'Mounted' -or $mdbCopy.Status -eq 'Healthy') {
             $mbody += "<td class = ""good"">$($mdbCopy.Status)</td>"
         }
@@ -867,7 +845,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - Status is [$($mdbCopy.Status)]</td></tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.Status)</td>"
         }
-        #CopyQueueLength
+        # CopyQueueLength
         if ($mdbCopy.CopyQueueLength -ge $t_copyQueue) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - CopyQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_copyQueue)</td></tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.CopyQueueLength)</td>"
@@ -875,7 +853,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
         else {
             $mbody += "<td class = ""good"">$($mdbCopy.CopyQueueLength)</td>"
         }
-        #LogCopyQueueIncreasing
+        # LogCopyQueueIncreasing
         if ($mdbCopy.LogCopyQueueIncreasing -eq $true) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - LogCopyQueueIncreasing</tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.LogCopyQueueIncreasing)</td>"
@@ -883,7 +861,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
         else {
             $mbody += "<td class = ""good"">$($mdbCopy.LogCopyQueueIncreasing)</td>"
         }
-        #ReplayQueueLength
+        # ReplayQueueLength
         if ($mdbCopy.ReplayQueueLength -ge $t_replayQueue) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - ReplayQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_replayQueue)</td></tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.ReplayQueueLength)</td>"
@@ -891,7 +869,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
         else {
             $mbody += "<td class = ""good"">$($mdbCopy.ReplayQueueLength)</td>"
         }
-        #LogReplayQueueIncreasing
+        # LogReplayQueueIncreasing
         if ($mdbCopy.LogReplayQueueIncreasing -eq $true) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - LogReplayQueueIncreasing</tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.LogReplayQueueIncreasing)</td>"
@@ -899,7 +877,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
         else {
             $mbody += "<td class = ""good"">$($mdbCopy.LogReplayQueueIncreasing)</td>"
         }
-        #ContentIndexState
+        # ContentIndexState
         if ($mdbCopy.ContentIndexState -eq "Healthy") {
             $mbody += "<td class = ""good"">$($mdbCopy.ContentIndexState)</td>"
         }
@@ -913,7 +891,7 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
             $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - ContentIndexState is $($mdbCopy.ContentIndexState)</tr>"
             $mbody += "<td class = ""bad"">$($mdbCopy.ContentIndexState)</td>"
         }
-        #ContentIndexErrorMessage
+        # ContentIndexErrorMessage
         $mbody += "<td class = ""bad"">$($mdbCopy.ContentIndexErrorMessage)</td>"
     }
     $mbody += '</tr>'
@@ -925,7 +903,6 @@ Function Get-DAGCopyStatusReport ($mdbCopyStatus) {
 Function Get-ExServerComponent ($exServerList) {
     'Server Component State... ' | Say
     foreach ($exServer in $exServerList) {
-        #$stats_collection += (Get-ServerComponentState $exServer | Where-Object {$_.State -ne 'Active'} | Select-Object Identity,Component,State)
         Loud "     --> Getting server component state on $($exServer)"
         $stats_collection += (Get-ServerComponentState $exServer | Where-Object { $_.Component -notin $Ignore_Server_Component } | Select-Object Identity, Component, State)
     }
@@ -993,12 +970,9 @@ Function Get-ReplicationReport ($replInfo) {
             $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result.ToString())</td><td></td></tr>"
         }
         else {
-            ## remove empty lines in the error and convert to HTML break lines
+            ## remove empty lines in the error and convert to HTML break
             $replError = ($repl.Error -split "`n" | Select-String -Pattern '\S').Line -join '<br />'
-            # $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result.ToString()) - $($repl.Error -replace "`n",'<br />')</td></tr>"
-            # $errString += "<tr><td>Replication</td></td><td>$($currentServer) - $($repl.Check) is $($repl.Result.ToString()) - $($replError)</td></tr>"
             $errString += "<tr><td>Replication</td></td><td>$($repl.Check) is $($repl.Result.ToString()) - $($replError)</td></tr>"
-            # $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$($repl.Error)</td></tr>"
             $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$($replError)</td></tr>"
         }
     }
@@ -1084,9 +1058,8 @@ Function Get-MdbReport ($dblist) {
     $mbody += '<table id="SectionLabels"><tr><th class="data">Mailbox Database Status</th></tr></table>'
     $mbody += '<table id="data"><tr><th>[Name][EDB Path][Log Path]</th><th>Mounted</th><th>On Server [Preference]</th><th>EDB Disk Size [Free] <br /> Log Disk Size [Free]</th><th>Size (GB)</th><th>White Space (GB)</th><th>Active Mailbox</th><th>Disconnected Mailbox</th><th>Item Size (GB)</th><th>Deleted Items Size (GB)</th><th>Full Backup</th><th>Incremental Backup</th><th>Backup In Progress</th><th>Mapi Connectivity</th></tr>'
     ForEach ($db in $dblist) {
-        #$dbDetails = Get-MailboxDatabase $db.Name
         if ($db.mounted -eq $true) {
-            #Calculate backup age----------------------------------------------------------
+            # Calculate backup age----------------------------------------------------------
             if ($db.LastFullBackup) {
                 $LastFullBackup = '{0:dd/MM/yyyy hh:mm tt}' -f $db.LastFullBackup
                 $LastFullBackupElapsed = New-TimeSpan -Start $db.LastFullBackup
@@ -1275,7 +1248,6 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
         if ($currentServer -ne $cpuAndMemData.Server) {
             $currentServer = $cpuAndMemData.Server
             $mbody += '<tr><th>Server Name</th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
-            # $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>CPU Load</th><th>CPU Top Processes</th><th>Memory Load</th><th>Memory Top Processes</th></tr>'
         }
 
         if ([int]$cpuAndMemData.CPU_Usage -lt $t_CPU_Usage_Percent) {
@@ -1300,15 +1272,15 @@ Function Get-CPUAndMemoryReport ($cpuAndMemDataResult) {
     return $mbody, $errString, $mResult, $testFailed
 }
 
-#SCRIPT BEGIN---------------------------------------------------------------
+# SCRIPT BEGIN---------------------------------------------------------------
 
-#Get-List of Exchange Servers and assign to array----------------------------
+# Get-List of Exchange Servers and assign to array----------------------------
 'Building List of Servers - excluding Edge' | Say
 $temp_ExServerList = Get-ExchangeServer | Where-Object { $_.ServerRole -notmatch 'Edge' } | Sort-Object Name
 $dagMemberCount = Get-MailboxServer | Where-Object { $_.DatabaseAvailabilityGroup }
 if (!$dagMemberCount) { $dagMemberCount = @() }
 
-#Get rid of excluded Servers
+# Get rid of excluded Servers
 $ExServerList = @()
 foreach ($ExServer in $temp_ExServerList) {
     if ($Ignore_Server_Name -notcontains $ExServer.Name) {
@@ -1326,8 +1298,8 @@ $Ex2010TransportServers = @()
 $Ex2010TransportServers += $ExServerList | Where-Object { $_.AdminDisplayVersion -like "Version 14*" -and $_.ServerRole -match 'HubTransport' }
 $transportServers = @()
 $transportServers += $nonEx2010transportServers + $Ex2010TransportServers
-#----------------------------------------------------------------------------
-#Get-List of Mailbox Database and assign to array----------------------------
+# ----------------------------------------------------------------------------
+# Get-List of Mailbox Database and assign to array----------------------------
 if ($Mailbox_Database -eq $true -OR $Database_Copy -eq $true) {
     'Building List of Mailbox Database' | Say
     $temp_ExMailboxDBList = Get-MailboxDatabase -Status | Where-Object { $_.Recovery -eq $False -and $_.Server -notin $Ignore_Server_Name }
@@ -1344,15 +1316,15 @@ if ($Mailbox_Database -eq $true -OR $Database_Copy -eq $true) {
     Loud "     --> Ignored Database: $($Ignore_MB_Database -join ';')"
     $activeServers = $activeServers | Select-Object -Unique
 }
-#----------------------------------------------------------------------------
-#Get-List of Public Folder Database and assign to array----------------------
+# ----------------------------------------------------------------------------
+# Get-List of Public Folder Database and assign to array----------------------
 if ($Public_Folder_Database -eq $true) {
     'Building List of Public Folder Database' | Say
     $temp_ExPFDBList = Get-PublicFolderDatabase -Status | Where-Object { $_.Recovery -eq $False }
     if (!$temp_ExPFDBList) { $temp_ExPFDBList = @() }
     $ExPFDBList = @()
 
-    #Get rid of excluded PF Database
+    # Get rid of excluded PF Database
     foreach ($ExPFDB in $temp_ExPFDBList) {
         if ($Ignore_PF_Database -notcontains $ExPFDB.Name) {
             $ExPFDBList += $ExPFDB
@@ -1362,7 +1334,7 @@ if ($Public_Folder_Database -eq $true) {
 }
 #----------------------------------------------------------------------------
 
-#Begin Data Extraction-------------------------------------------------------
+# Begin Data Extraction-------------------------------------------------------
 $hr | Say
 'Begin Data Extraction' | Say
 if ($CPU_and_RAM -eq $true) { $cpuHealthData = Get-CPUAndMemoryLoad($ExServerList) ; }
@@ -1375,7 +1347,7 @@ if ($DAG_Replication -eq $true -and $dagMemberCount.count -gt 0) { $repldata = G
 if ($Mail_Queue -eq $true) { $queueData = Get-MailQueueCount ($transportServers) ; }
 if ($Disk_Space -eq $true) { $diskdata = Get-DiskSpaceStatistic($ExServerList) ; }
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Build Report --------------------------------------------------------------
 $hr | Say
 'Create Report' | Say
@@ -1400,7 +1372,7 @@ $mail_body += '<table id="HeadingInfo">'
 $mail_body += '<tr><th>' + $Company_Name + '<br />' + $Email_Subject + '<br />' + $today + '</th></tr>'
 $mail_body += '</table>'
 
-##Set Individual Test Results
+# Set Individual Test Results
 $testPassed = $enabledTestCount - $testFailed
 $percentPassed = ($testPassed / $enabledTestCount) * 100
 $percentPassed = [math]::Round($percentPassed)
@@ -1483,7 +1455,7 @@ $mail_body += '</html>'
 # $mbody = $mbox -replace "&gt;", ">"
 $mail_body | Out-File $Report_File_Path
 'HTML Report @ ' + $Report_File_Path | Say
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Mail Parameters------------------------------------------------------------
 $params = @{
     Body       = $mail_body
@@ -1499,10 +1471,10 @@ if ($To_Address) { $params.Add('To', $To_Address) }
 if ($Cc_Address) { $params.Add('Cc', $Cc_Address) }
 if ($Bcc_Address) { $params.Add('Bcc', $Bcc_Address) }
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Send Report----------------------------------------------------------------
 if ($Send_Email_Report -eq $true) { 'Sending Report...' | Say ; Send-MailMessage @params }
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # "" | Say
 $hr | Say
 "Enabled Tests: $($enabledTestCount) [of $($availableTestCount)]" | Say
@@ -1518,7 +1490,7 @@ switch ($overAllResult) {
 "======================================" | Say
 "" | Say
 
-#SCRIPT END------------------------------------------------------------------
-if ($config.Output.Enable_Transcript_Logging) { LogEnd }
+# SCRIPT END------------------------------------------------------------------
+LogEnd
 
 
