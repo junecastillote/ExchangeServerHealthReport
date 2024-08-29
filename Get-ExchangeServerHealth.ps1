@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 0.1
+.VERSION 0.2
 
 .GUID 963ce0ae-f75b-4da0-b917-f96b5b0cf4cb
 
@@ -27,7 +27,7 @@
 
 .RELEASENOTES
 {
-  "ReleaseDate" : "2024-08-08"
+  "ReleaseDate":"2024-08-29"
 }
 
 .PRIVATEDATA
@@ -688,12 +688,21 @@ Function Get-ServerHealth ($serverlist) {
                 }
             }
             #Mail Flow
-            if ($server.serverrole -match 'Mailbox' -AND $activeServers -contains $server.name) {
-                Loud "     --> Testing mail flow on $($server.name)"
-                $mailflowresult = $null
-                $result = Test-MailFlow -TargetMailboxServer $server.Name
-                $mailflowresult = $result.TestMailflowResult
-                $serverObj.MailFlow = $mailflowresult
+            if ($server.serverrole -match 'Mailbox') {
+                if ($server.name -in $activeServers) {
+                    Loud "     --> Testing mail flow on $($server.name)"
+                    $mailflowresult = $null
+                    $result = Test-MailFlow -TargetMailboxServer $server.Name
+                    $mailflowresult = $result.TestMailflowResult
+                    $serverObj.MailFlow = $mailflowresult
+                }
+                else {
+                    Loud "     --> Skipping mail flow test on $($server.name) because it has no active mailbox databases."
+                    $mailflowresult = $null
+                    # $result = Test-MailFlow -TargetMailboxServer $server.Name
+                    $mailflowresult = 'NotApplicable'
+                    $serverObj.MailFlow = $mailflowresult
+                }
             }
         }
         else {
@@ -780,7 +789,7 @@ Function Get-ServerHealthReport ($serverhealthinfo) {
             $mbody += '<td class = "good">Success</td>'
         }
         else {
-            $mbody += '<td class = "good"></td>'
+            $mbody += '<td class = "good">' + $server.MailFlow + '</td>'
         }
         $mbody += '</tr>'
     }
@@ -1330,7 +1339,6 @@ if ($Public_Folder_Database -eq $true) {
             $ExPFDBList += $ExPFDB
         }
     }
-
 }
 #----------------------------------------------------------------------------
 
