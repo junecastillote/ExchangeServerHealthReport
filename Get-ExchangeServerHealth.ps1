@@ -71,30 +71,6 @@ Function LogStart {
     Start-Transcript $logPath -Force | Out-Null
 }
 
-# Function BuildNumberToName {
-#     param (
-#         [string]$BuildNumber
-#     )
-#     $definitions = Import-Csv "$script_root\ExchangeBuildNumbers.csv"
-#     $definitions | Where-Object { $_.'Build Number' -eq $BuildNumber }
-# }
-
-# Function TrimExchangeVersion {
-#     # This function formats the AdminDisplayVersion to Build Number
-#     # ie. "Version 15.2 (Build 1258.12)" to "15.2.1258.12"
-#     param (
-#         [string]$AdminDisplayVersion
-#     )
-#     $AdminDisplayVersion.ToString().Replace('Version ', '').Replace(' (Build ', '.').replace(')', '')
-# }
-
-# Function AdminDisplayVersionToName {
-#     param(
-#         [string]$AdminDisplayVersion
-#     )
-#     BuildNumberToName (TrimExchangeVersion $AdminDisplayVersion)
-# }
-
 Function GetExchangeServerVerion {
     param(
         [string]$ComputerName
@@ -181,7 +157,7 @@ $script_info = Test-ScriptFileInfo $MyInvocation.MyCommand.Definition
 #Import Configuration File
 if ((Test-Path $configFile) -eq $false) {
     "ERROR: File $($configFile) does not exist. Script cannot continue" | Say
-    "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt
+    "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt -Append
     return $null
 }
 
