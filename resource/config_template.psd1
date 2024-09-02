@@ -1,6 +1,6 @@
 @{
     Branding  = @{
-        Company_Name = 'MG PoshLab'
+        Company_Name = 'Organization Name Here'
     }
     TestItem  = @{
         CPU_and_RAM            = $true
@@ -32,17 +32,17 @@
     Mail      = @{
         Send_Email_Report = $true
         Email_Subject     = "Exchange Service Health Report"
-        SMTP_Server       = "mail.mg.poshlab.xyz"
+        SMTP_Server       = "192.168.10.10"
         Sender_Address    = "Exchange Admin <exchange-Admin@mg.poshlab.xyz>"
-        To_Address        = @('june.castillote@gmail.com')
-        Cc_Address        = @('june@poshlab.xyz')
+        To_Address        = @()
+        Cc_Address        = @()
         Bcc_Address       = @()
         SSL_Enabled       = $false
         Port              = 25
     }
     Exclusion = @{
-        Ignore_Server_Name      = @('')
-        Ignore_MB_Database      = @('DUMMY001')
+        Ignore_Server_Name      = @()
+        Ignore_MB_Database      = @()
         Ignore_PF_Database      = @()
         Ignore_Server_Component = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
