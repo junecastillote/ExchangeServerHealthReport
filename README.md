@@ -68,7 +68,7 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
 ```powershell
 @{
     Branding  = @{
-        Company_Name = 'MG PoshLab'
+        Company_Name = 'Organization Name Here'
     }
     TestItem  = @{
         CPU_and_RAM            = $true
@@ -86,7 +86,6 @@ The configuration file is an PSD1 file containing the options, thresholds, mail 
         Transcript_File_Path         = "C:\Scripts\ExchangeServiceHealth\transcript.log"
         Enable_Transcript_Logging    = $true
         Append_Timestamp_To_Filename = $false
-        Loud                         = $true
     }
     Threshold = @{
         Last_Full_Backup_Age_Day        = 7
@@ -145,7 +144,6 @@ This section list the tests that can be toggled by changing values with `$true` 
 - `Enable_Transcript_Logging` : Specify whether to enable transcript logging.
 - `Append_Timestamp_To_Filename` : When enabled, the output filename of the report and transcript will have the timestamp appended.
   - eg. `report_20240804T001023.html` - August 4, 2024, 12:10:23 AM (local time)
-- `Loud` - Enable or disable detailed console output. Default value is `$true`.
 
 ### Threshold
 
