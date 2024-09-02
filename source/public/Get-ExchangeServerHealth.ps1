@@ -469,7 +469,7 @@ Function Get-ExchangeServerHealth {
                 $mbody += "<td class = ""good"">$($server.Connectivity)</td><td class = ""bad"">$($server.UpTime)</td>"
             }
             elseif ($server.Uptime -eq 'Cannot retrieve up time') {
-                $errString += "<tr><td>Server Connectivity</td></td><td>$($server.server) - connection test failed. SERVER MIGHT BE DOWN!!!</td></tr>"
+                $errString += "<tr><td>Server Connectivity [$($server.server)]</td></td><td>$($server.server) - connection test failed. SERVER MIGHT BE DOWN!!!</td></tr>"
                 $mbody += "<td class = ""bad"">$($server.Connectivity)</td><td class = ""bad"">$($server.UpTime)</td>"
             }
             else {
@@ -580,12 +580,12 @@ Function Get-ExchangeServerHealth {
                 $mbody += "<td class = ""good"">$($mdbCopy.Status)</td>"
             }
             else {
-                $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - Status is [$($mdbCopy.Status)]</td></tr>"
+                $errString += "<tr><td>Database Copy [$($mdbCopy.Name)]</td></td><td>$($mdbCopy.Name) - Status is [$($mdbCopy.Status)]</td></tr>"
                 $mbody += "<td class = ""bad"">$($mdbCopy.Status)</td>"
             }
             # CopyQueueLength
             if ($mdbCopy.CopyQueueLength -ge $t_copyQueue) {
-                $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - CopyQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_copyQueue)</td></tr>"
+                $errString += "<tr><td>Database Copy [$($mdbCopy.Name)]</td></td><td>$($mdbCopy.Name) - CopyQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_copyQueue)</td></tr>"
                 $mbody += "<td class = ""bad"">$($mdbCopy.CopyQueueLength)</td>"
             }
             else {
@@ -695,23 +695,35 @@ Function Get-ExchangeServerHealth {
             if ($currentServer -ne $repl.Server) {
                 $currentServer = $repl.Server
                 $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>Result</th><th>Error</th></tr>'
+                # $mbody += '<tr><th><b><u>' + $currentServer + '</b></u></th><th>Result</th><th>Error</th><th>Notes</th></tr>'
             }
 
-            ## Check if the database with error is in the ignore database list
-            if ($match_db = $Ignore_MB_Database | Where-Object { $repl.Error -match $_ }) {
-                ## If DB is ignored, set result to Passed and skip to the next item.
-                $mbody += "<tr><td>$($repl.Check)</td><td>Passed</td><td>Ignored database: $($match_db)</td></tr>"
-                continue
-            }
+            if ($repl.Error) {
+                # Remove leading spaces by splitting an re-joining
+                $replError = (($repl.Error).replace('Failures:', $null).split("`n") -replace '^\s+', '') -join "`n"
+                # $replError = (($repl.Error).replace('Failures:', $null).split("`n") -replace '^\s+', '' | Select-Object -Skip 1) -join "`n"
+                # Split by single blank line
+                $replError = [regex]::Split($replError, '(?<=\S)\r?\n\r?\n(?=\S)')
 
-            if ($repl.Result.ToString() -eq 'Passed') {
-                $mbody += "<tr><td>$($repl.Check)</td><td>$($repl.Result.ToString())</td><td></td></tr>"
+
+                $replErrorMessage = @()
+                foreach ($item in $replError) {
+                    # If the error message doesn't match the ignored database name, add it to the $replErrorMessage collection
+                    if (!($Ignore_MB_Database | Where-Object { $item -match $_ }) ) {
+                        $replErrorMessage += $item
+                    }
+                }
+
+                if ($replErrorMessage.Count -gt 0) {
+                    $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$((($replErrorMessage) -join '<br>==============================<br>').Replace("`n","<br>"))</td></tr>"
+                    $errString += "<tr><td>Replication [$($currentServer)]</td></td><td>$($repl.Check) is $($repl.Result.ToString()) - $((($replErrorMessage) -join '<br>==============================<br>').Replace("`n","<br>"))</td></tr>"
+                }
+                else {
+                    $mbody += "<tr><td>$($repl.Check)</td><td class = ""good"">$($repl.Result.ToString())</td><td></td></tr>"
+                }
             }
             else {
-                ## remove empty lines in the error and convert to HTML break
-                $replError = ($repl.Error -split "`n" | Select-String -Pattern '\S').Line -join '<br />'
-                $errString += "<tr><td>Replication</td></td><td>$($repl.Check) is $($repl.Result.ToString()) - $($replError)</td></tr>"
-                $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$($replError)</td></tr>"
+                $mbody += "<tr><td>$($repl.Check)</td><td class = ""good"">$($repl.Result.ToString())</td><td></td></tr>"
             }
         }
         $mbody += ""
@@ -1080,7 +1092,7 @@ Function Get-ExchangeServerHealth {
     if ($Mailbox_Database -eq $true) { $mdbdata = Get-MdbStatistic ($ExMailboxDBList) | Sort-Object Name ; }
     if ($Public_Folder_Database -eq $true -AND $ExPFDBList.Count -gt 0) { $pdbdata = Get-PdbStatistic ($ExPFDBList) ; }
     else {
-        $enabledTestCount--
+        # $enabledTestCount--
         Say 'Public Folder Database Check... '
         Say '     --> No public folder databases found.'
     }
@@ -1154,7 +1166,8 @@ Function Get-ExchangeServerHealth {
     if ($Disk_Space -eq $true) { $mail_body += $diskreport ; $mail_body += '</table>' }
     $mail_body += '<p><table id="SectionLabels">'
     $mail_body += '<tr><th>----END of REPORT----</th></tr></table></p>'
-    $mail_body += '<p><font size="2" face="Tahoma"><u>Report Paremeters</u><br />'
+    # $mail_body += '<p><font size="2" face="Tahoma"><u>Report Paremeters</u><br />'
+    $mail_body += '<p><font size="2" face="Tahoma"><br />'
     $mail_body += '<b>[THRESHOLD]</b><br />'
     $mail_body += 'Last Full Backup: ' + $t_Last_Full_Backup_Age_Day + ' Day(s)<br />'
     $mail_body += 'Last Incremental Backup: ' + $t_Last_Incremental_Backup_Age_Day + ' Day(s)<br />'
