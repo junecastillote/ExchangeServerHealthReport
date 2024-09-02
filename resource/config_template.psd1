@@ -7,7 +7,7 @@
         Server_Health          = $true
         Mailbox_Database       = $true
         Server_Component       = $true
-        Public_Folder_Database = $true
+        Public_Folder_Database = $false
         DAG_Replication        = $true
         Mail_Queue             = $true
         Disk_Space             = $true
@@ -32,17 +32,17 @@
     Mail      = @{
         Send_Email_Report = $true
         Email_Subject     = "Exchange Service Health Report"
-        SMTP_Server       = "192.168.10.10"
-        Sender_Address    = "Exchange Admin <exchange-Admin@mg.poshlab.xyz>"
-        To_Address        = @()
+        SMTP_Server       = "mail.server.address.here"
+        Sender_Address    = "Exchange Admin <exchange-Admin@domain.tld>"
+        To_Address        = @('admin1@domain.tld')
         Cc_Address        = @()
         Bcc_Address       = @()
         SSL_Enabled       = $false
         Port              = 25
     }
     Exclusion = @{
-        Ignore_Server_Name      = @()
-        Ignore_MB_Database      = @()
+        Ignore_Server_Name      = @('')
+        Ignore_MB_Database      = @('DUMMY001')
         Ignore_PF_Database      = @()
         Ignore_Server_Component = @('ForwardSyncDaemon', 'ProvisioningRps')
     }
