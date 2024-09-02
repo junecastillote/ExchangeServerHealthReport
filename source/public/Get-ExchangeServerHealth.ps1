@@ -1178,8 +1178,7 @@ Function Get-ExchangeServerHealth {
     }
 
     $mail_body += '<br /><b>[REPORT]</b><br />'
-    $mail_body += 'Generated from Server: ' + ($env:computername) + '<br />'
-    $mail_body += 'Script File: ' + $MyInvocation.MyCommand.Definition + '<br />'
+    $mail_body += 'Host: ' + ($env:computername) + '<br />'
     $mail_body += 'Config File: ' + (Resolve-Path $configFile).Path + '<br />'
     $mail_body += 'Report File: ' + (Resolve-Path $Report_File_Path).Path + '<br />'
 
@@ -1193,10 +1192,8 @@ Function Get-ExchangeServerHealth {
     $mail_body += 'Excluded Mailbox Database: ' + (@($config.Exclusion.Ignore_MB_Database) -join ';') + '<br />'
     $mail_body += 'Excluded Public Database: ' + (@($config.Exclusion.Ignore_PF_Database) -join ';') + '<br />'
     $mail_body += '</p><p>'
-    $mail_body += '<a href="' + $module_Info.ProjectURI.OriginalString + '">' + $module_Info.Name.ToString() + ' ' + $module_Info.Version.ToString() + '</a></p>'
+    $mail_body += '<a href="' + $module_Info.ProjectURI.OriginalString + '" target="_blank">' + $module_Info.Name.ToString() + ' ' + $module_Info.Version.ToString() + '</a></p>'
     $mail_body += '</html>'
-    # $mbody = $mbox -replace "&lt;", "<"
-    # $mbody = $mbox -replace "&gt;", ">"
     $mail_body | Out-File $Report_File_Path
     'HTML Report @ ' + $Report_File_Path | Say
     # ----------------------------------------------------------------------------
