@@ -12,7 +12,7 @@ Function Connect-ExchangeRemoteShell {
     $orgConfigCmd = Get-Command Get-OrganizationConfig -ErrorAction SilentlyContinue
 
     if (!$orgConfigCmd) {
-        "Attempting to connect to the Remote Exchange Management Shell." | Say -Color Yellow
+        "Attempting to connect to the Remote Exchange Management Shell." | Say
         . "$($env:ExchangeInstallPath)\Bin\RemoteExchange.ps1"; Connect-ExchangeServer -auto
     }
 }
