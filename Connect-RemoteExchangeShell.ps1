@@ -1,1 +1,0 @@
-. "$($env:ExchangeInstallPath)\Bin\RemoteExchange.ps1"; Connect-ExchangeServer -auto;
