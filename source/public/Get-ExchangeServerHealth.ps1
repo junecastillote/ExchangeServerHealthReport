@@ -580,12 +580,12 @@ Function Get-ExchangeServerHealth {
                 $mbody += "<td class = ""good"">$($mdbCopy.Status)</td>"
             }
             else {
-                $errString += "<tr><td>Database Copy [$($mdbCopy.Name)]</td></td><td>$($mdbCopy.Name) - Status is [$($mdbCopy.Status)]</td></tr>"
+                $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - Status is [$($mdbCopy.Status)]</td></tr>"
                 $mbody += "<td class = ""bad"">$($mdbCopy.Status)</td>"
             }
             # CopyQueueLength
             if ($mdbCopy.CopyQueueLength -ge $t_copyQueue) {
-                $errString += "<tr><td>Database Copy [$($mdbCopy.Name)]</td></td><td>$($mdbCopy.Name) - CopyQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_copyQueue)</td></tr>"
+                $errString += "<tr><td>Database Copy</td></td><td>$($mdbCopy.Name) - CopyQueueLength [$($mdbCopy.CopyQueueLength)] is >= $($t_copyQueue)</td></tr>"
                 $mbody += "<td class = ""bad"">$($mdbCopy.CopyQueueLength)</td>"
             }
             else {
@@ -716,7 +716,7 @@ Function Get-ExchangeServerHealth {
 
                 if ($replErrorMessage.Count -gt 0) {
                     $mbody += "<tr><td>$($repl.Check)</td><td class = ""bad"">$($repl.Result.ToString())</td><td>$((($replErrorMessage) -join '<br>==============================<br>').Replace("`n","<br>"))</td></tr>"
-                    $errString += "<tr><td>Replication [$($currentServer)]</td></td><td>$($repl.Check) is $($repl.Result.ToString()) - $((($replErrorMessage) -join '<br>==============================<br>').Replace("`n","<br>"))</td></tr>"
+                    $errString += "<tr><td>Replication</td></td><td> [$($currentServer)] - $($repl.Check) is $($repl.Result.ToString()) - $((($replErrorMessage) -join '<br>==============================<br>').Replace("`n","<br>"))</td></tr>"
                 }
                 else {
                     $mbody += "<tr><td>$($repl.Check)</td><td class = ""good"">$($repl.Result.ToString())</td><td></td></tr>"
