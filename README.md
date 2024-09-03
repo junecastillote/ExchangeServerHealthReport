@@ -56,7 +56,11 @@ The account that runs this script must have the following:
 
 ## Downloading the Module
 
-Download the latest version from this GitHub repository - [Exchange Server Health Report (main)](https://github.com/junecastillote/Exchange-Server-Health-Report)
+- Download the latest version from this GitHub repository - [Exchange Server Health Report (main)](https://github.com/junecastillote/ExchangeServerHealthReport).
+  - Or you can click this [direct link](https://github.com/junecastillote/Exchange-Server-Health-Report/archive/refs/heads/main.zip) to download the ZIP package.
+- Once downloaded, extract the ZIP to your desired folder.
+  - For example, to C:\Scripts
+
 
 ## Get-ExchangeServerHealth.ps1
 
