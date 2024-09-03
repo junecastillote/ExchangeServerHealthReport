@@ -9,10 +9,21 @@ Function Get-ExchangeServerHealth {
 
     # Start Script
 
+    $errorLog = "$($env:USERPROFILE)\ExchangeServerHealth\error.txt"
+    if (!(Test-Path $errorLog)) {
+        $errorLog = (New-Item -ItemType File -Path $errorLog -Force).FullName
+    }
+
     #Import Configuration File
     if ((Test-Path $configFile) -eq $false) {
         "ERROR: File $($configFile) does not exist. Script cannot continue" | Say
-        "ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File error.txt -Append
+        "$(Get-Date) - ERROR: File $($configFile) does not exist. Script cannot continue" | Out-File $errorLog -Append
+        return $null
+    }
+
+    if ($psVersionTable['PSEdition'] -eq 'Core') {
+        "ERROR: This module requires Windows PowerShell. It cannot run on PowerShell Core." | Say
+        "$(Get-Date) - ERROR: This module requires Windows PowerShell. It cannot run on PowerShell Core." | Out-File $errorLog -Append
         return $null
     }
 
