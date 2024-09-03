@@ -3,6 +3,7 @@
 ## Version 0.3
 
 - Converted to a module.
+- Added logic to handle DAG replication errors with mailbox database exclusions.
 
 ## Version 0.2
 
