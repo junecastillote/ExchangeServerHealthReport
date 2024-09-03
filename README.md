@@ -265,11 +265,17 @@ This example runs the script using the `demo-config.psd1` configuration file on 
 
 ## Q and A
 
+- **I run this in Task Scheduler but there's no output. How can I validate it?**
+  - Ensure that the `Enable_Transcript_Logging` is set to `$true` in the configuration file.
+  - Check the transcript log file.
+  - Check the error log at `$env:USERPROFILE\ExchangeServerHealth\error.txt`.
+    ![error.txt](resource/images/errorLog.png)
 - **Do I have to run this in Exchange Management Shell?**
-  - No. You can run this in a normal Windows PowerShell window and the module will automatically call the Exchange Management Shell implicit remoting, provided that the Exchange Server Management Tools is present on the local machine.
+  - No. You can run this in a normal Windows PowerShell window. The `Get-ExchangeServerHealth` command will automatically call the Exchange Management Shell implicit remoting, provided that the Exchange Management Tools is installed on the local machine.
+  - But you can also run this inside the Exchange Management Shell and it will bypass the call for implicit remoting.
 - **Will this work on PowerShell 7?**
-  - Currently, this module is untested on PowerShell 7.
-  - Please feedback if you tried.
+  - No. Stick with Windows PowerShell.
+    ![PowerShell Core](resource/images/pscore.png)
 - **The HTML report design hurts by eyes. Is there any way to change it?**
   - First, sorry, I'm not a designer. I such as UX.
   - But feel free to take a stab at it by modifying the `resources/style.css` file.
