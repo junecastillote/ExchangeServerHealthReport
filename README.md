@@ -22,6 +22,7 @@ PowerShell module to extract and report Exchange server health statistics.
   - [Example 2: Running as a Scheduled Task](#example-2-running-as-a-scheduled-task)
 - [Sample HTML Report](#sample-html-report)
 - [Current Limitations](#current-limitations)
+- [Q and A](#q-and-a)
 
 ## What the module does?
 
@@ -29,7 +30,7 @@ The module performs several checks on your Exchange Servers like the ones below:
 
 - Server Health (Up Time, Server Roles Services, Mail flow,...)
 - Mailbox Database Status (Mounted, Backup, Size, and Space, Mailbox Count, Paths,...)
-- Public Folder Database Status (Mount, Backup, Size, and Space,...)
+- Public Folder Database Status (Mount, Backup, Size, and Space,...) - *Planned for removal in future versions*
 - Database Copy Status
 - Database Replication Status
 - Mail Queue
@@ -260,3 +261,17 @@ This example runs the script using the `demo-config.psd1` configuration file on 
 - **No SMTP authentication capability**.
   - The built-in logic to send email reports has no feature to use authentication. It assumes that the SMTP relay is anonymous, which is usually the case when using on-premises SMTP relay services that uses IP-based security to allow relay.
   - If you need to use an authenticated SMTP relay, you must implement a separate script that takes the HTML report output of this module and send it separately.
+  - There is currently no plan to include this feature.
+
+## Q and A
+
+- **Do I have to run this in Exchange Management Shell?**
+  - No. You can run this in a normal Windows PowerShell window and the module will automatically call the Exchange Management Shell implicit remoting, provided that the Exchange Server Management Tools is present on the local machine.
+- **Will this work on PowerShell 7?**
+  - Currently, this module is untested on PowerShell 7.
+  - Please feedback if you tried.
+- **The HTML report design hurts by eyes. Is there any way to change it?**
+  - First, sorry, I'm not a designer. I such as UX.
+  - But feel free to take a stab at it by modifying the `resources/style.css` file.
+- **Where can I report issues or provide feedback?**
+  - You can [open an issue](https://github.com/junecastillote/ExchangeServerHealthReport/issues).
