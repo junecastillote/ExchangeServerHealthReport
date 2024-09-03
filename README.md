@@ -7,6 +7,7 @@ PowerShell script to extract and report Exchange server health statistics.
 - [What the script does?](#what-the-script-does)
 - [System Requirements](#system-requirements)
 - [Permission Requirements](#permission-requirements)
+- [Downloading the Module](#downloading-the-module)
 - [Get-ExchangeServerHealth.ps1](#get-exchangeserverhealthps1)
 - [Configuration File Template](#configuration-file-template)
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
@@ -52,6 +53,10 @@ The account that runs this script must have the following:
 
 - Minimum: Exchange role group membership `View-Only Organization Management`.
 - Minimum: Local `administrator` rights on Exchange Server computers.
+
+## Downloading the Module
+
+Download the latest version from this GitHub repository - [Exchange Server Health Report (main)](https://github.com/junecastillote/Exchange-Server-Health-Report)
 
 ## Get-ExchangeServerHealth.ps1
 
@@ -143,7 +148,7 @@ This section list the tests that can be toggled by changing values with `$true` 
 - `Transcript_File_Path` : File path and name of the transcript.
 - `Enable_Transcript_Logging` : Specify whether to enable transcript logging.
 - `Append_Timestamp_To_Filename` : When enabled, the output filename of the report and transcript will have the timestamp appended.
-  - eg. `report_20240804T001023.html` - August 4, 2024, 12:10:23 AM (local time)
+  - eg. If the `Report_File_Path` = `C:\report.html`, the resulting filename on each report is `C:\report_20240804T001023.html` - August 4, 2024, 12:10:23 AM (local time)
 
 ### Threshold
 
