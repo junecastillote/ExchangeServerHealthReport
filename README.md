@@ -1,14 +1,14 @@
 # Exchange Server Health Report
 
-PowerShell script to extract and report Exchange server health statistics.
+PowerShell module to extract and report Exchange server health statistics.
 
-> NOTE: This script is based on the previous script called [Get-ExchangeHealth.ps1](https://github.com/junecastillote/Get-ExchangeHealth). I decided to create a new repository for a new script because of many breaking changes made on this one, especially to the configuration file contents and parameters.
+> NOTE: This module is based on the previous script called [Get-ExchangeHealth.ps1](https://github.com/junecastillote/Get-ExchangeHealth). I decided to create a new repository for a new script because of many breaking changes made on this one, especially to the configuration file contents and parameters.
 
-- [What the script does?](#what-the-script-does)
+- [What the module does?](#what-the-module-does)
 - [System Requirements](#system-requirements)
 - [Permission Requirements](#permission-requirements)
 - [Downloading the Module](#downloading-the-module)
-- [Get-ExchangeServerHealth.ps1](#get-exchangeserverhealthps1)
+- [Get-ExchangeServerHealth](#get-exchangeserverhealth)
 - [Configuration File Template](#configuration-file-template)
 - [Configuration File Settings Explained](#configuration-file-settings-explained)
   - [Branding](#branding)
@@ -18,13 +18,14 @@ PowerShell script to extract and report Exchange server health statistics.
   - [Mail](#mail)
   - [Exclusion](#exclusion)
 - [Usage Examples](#usage-examples)
-  - [Example 1: Running Manually in Exchange Management Shell](#example-1-running-manually-in-exchange-management-shell)
+  - [Example 1: Manual Run](#example-1-manual-run)
   - [Example 2: Running as a Scheduled Task](#example-2-running-as-a-scheduled-task)
 - [Sample HTML Report](#sample-html-report)
+- [Current Limitations](#current-limitations)
 
-## What the script does?
+## What the module does?
 
-The script performs several checks on your Exchange Servers like the ones below:
+The module performs several checks on your Exchange Servers like the ones below:
 
 - Server Health (Up Time, Server Roles Services, Mail flow,...)
 - Mailbox Database Status (Mounted, Backup, Size, and Space, Mailbox Count, Paths,...)
@@ -39,17 +40,17 @@ Then an HTML report will be generated and can be sent via email if enabled in th
 
 ## System Requirements
 
-- This script is compatible with Exchange Server versions:
+- This module is compatible with Exchange Server versions:
   - 2010 (will be removed in future script releases)
   - 2013
   - 2016
   - 2019
-- This script must be run on an Exchange Server with at least one mailbox database active.
+- This module must be run on an Exchange Server with at least one mailbox database active.
 - Windows PowerShell 5.1
 
 ## Permission Requirements
 
-The account that runs this script must have the following:
+The account that runs this module must have the following:
 
 - Minimum: Exchange role group membership `View-Only Organization Management`.
 - Minimum: Local `administrator` rights on Exchange Server computers.
@@ -58,21 +59,22 @@ The account that runs this script must have the following:
 
 - Download the latest version from this GitHub repository - [Exchange Server Health Report (main)](https://github.com/junecastillote/ExchangeServerHealthReport).
   - Or you can click this [direct link](https://github.com/junecastillote/Exchange-Server-Health-Report/archive/refs/heads/main.zip) to download the ZIP package.
-- Once downloaded, extract the ZIP to your desired folder.
-  - For example, to C:\Scripts
+- Once downloaded, extract the ZIP to your desired folder.For example, to `C:\Scripts\ExchangeServerHealth`
+- Finally, import the module by running this command in PowerShell.
 
+  ```PowerShell
+  Import-Module C:\Scripts\ExchangeServerHealth\ExchangeServerHealthReport.psd1
+  ```
 
-## Get-ExchangeServerHealth.ps1
+## Get-ExchangeServerHealth
 
-The `Get-ExchangeServerHealth.ps1` script accepts the following parameter.
+The `Get-ExchangeServerHealth` function accepts the following parameter.
 
-`-ConfigFile` : To specify the PowerShell data file (*.psd1) that contains the configuration for the script.
-
-`-EnableDebug` : Optional switch to start a transcript output to debugLog.txt
+`-ConfigFile` : To specify the PowerShell data file (*.psd1) that contains the configuration for the script. (see [Configuration File Template](#configuration-file-template)).
 
 ## Configuration File Template
 
-The configuration file is an PSD1 file containing the options, thresholds, mail settings, and exclusions that will be used by the script. The snapshot of the configuration file template is shown below:
+The configuration file is an `PSD1` file containing the options, thresholds, mail settings, and exclusions that will be used by the script. The sample of the configuration file template is shown below:
 
 ```powershell
 @{
@@ -191,31 +193,39 @@ This section is where the exclusions can be defined.
 
 ## Usage Examples
 
-> NOTE: Use this script only in Exchange Management Shell or Remote PowerShell session to the Exchange Server.
-
-### Example 1: Running Manually in Exchange Management Shell
+### Example 1: Manual Run
 
 ```PowerShell
-.\Get-ExchangeServerHealth.ps1 -ConfigFile .\config.psd1
+# Import the module
+Import-Module .\ExchangeServerHealthReport.psd1
+# Run the report
+Get-ExchangeServerHealth -ConfigFile .\demo-config.psd1
 ```
 
-This example runs the script using the `config.psd1` configuration file on the same directory.
+This example runs the script using the `demo-config.psd1` configuration file on the same directory.
+
  ![Example 1](resource/images/Example_01.png)
 
 ### Example 2: Running as a Scheduled Task
 
 1. First, create a run file. Below is an example called `run.ps1`.
 
-    > **Note**: Replace the full path of the script (`C:\Scripts\ExchangeServerhealth\Get-ExchangeServerHealth.ps1`) and configuration (`C:\Scripts\ExchangeServerhealth\config.psd1`) files as needed.
+    > **Note**: Replace the full path of the `$moduleFile` and `$configFile` files as needed.
 
     ```PowerShell
     # run.ps1
 
-    # Start Exchange PowerShell implicit remoting session
-    . "$($env:ExchangeInstallPath)\Bin\RemoteExchange.ps1"; Connect-ExchangeServer -auto
+    # Specify the module file path
+    $moduleFile = "C:\Scripts\ExchangeServiceHealth\ExchangeServerHealthReport.psd1"
 
-    # Run the server health report
-    & C:\Scripts\ExchangeServerhealth\Get-ExchangeServerHealth.ps1 -ConfigFile C:\Scripts\ExchangeServerhealth\config.psd1
+    # Specify the configuration file path
+    $configFile = "C:\Scripts\ExchangeServiceHealth\config.psd1"
+
+    # Import the module
+    Import-Module $moduleFile -Force
+
+    # Run the report
+    Get-ExchangeServerHealth -ConfigFile $configFile
 
     ```
 
@@ -244,3 +254,9 @@ This example runs the script using the `config.psd1` configuration file on the s
 ## Sample HTML Report
 
 ![Sample HTML report](resource/images/sample_html_report.png)
+
+## Current Limitations
+
+- **No SMTP authentication capability**.
+  - The built-in logic to send email reports has no feature to use authentication. It assumes that the SMTP relay is anonymous, which is usually the case when using on-premises SMTP relay services that uses IP-based security to allow relay.
+  - If you need to use an authenticated SMTP relay, you must implement a separate script that takes the HTML report output of this module and send it separately.
